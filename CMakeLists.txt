@@ -22,5 +22,42 @@ add_library(slam STATIC
     src/vslam.cpp
 )
 
+find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
+if(yaml-cpp_FOUND)
+    message("yaml-cpp ${yaml-cpp_VERSION} found")
+    target_link_libraries(slam PUBLIC yaml-cpp::yaml-cpp)
+else()
+    message("yaml-cpp not found")
+endif()
+
+find_package(Eigen3 REQUIRED PATHS "thirdparty/eigen")
+if(Eigen3_FOUND)
+    message("Eigen3 ${Eigen3_VERSION} found")
+    target_link_libraries(slam PUBLIC Eigen3::Eigen)
+else()
+    message("Eigen3 not found")
+endif()
+
+find_package(OpenCV 4.11.0 EXACT REQUIRED PATHS "thirdparty/opencv")
+if(OpenCV_FOUND)
+    message("OpenCV ${OpenCV_VERSION} found")
+    target_link_libraries(slam PUBLIC ${OpenCV_LIBS})
+else()
+    message("OpenCV not found")
+endif()
+
+find_package(g2o 1.0.0 EXACT REQUIRED PATHS "thirdparty/g2o")
+if(g2o_FOUND)
+    message("g2o ${g2o_VERSION} found")
+    target_link_libraries(slam PUBLIC g2o::core)
+endif()
+
+find_package(Pangolin 0.9.2 EXACT REQUIRED PATHS "thirdparty/pangolin")
+if(Pangolin_FOUND)
+    message("Pangolin ${Pangolin_VERSION} found")
+    target_link_libraries(slam PUBLIC ${Pangolin_LIBRARY})
+endif()
+
+
 add_executable(main examples/main.cpp)
 target_link_libraries(main slam)

@@ -8,17 +8,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /vslam/thirdparty
-RUN mkdir yaml_cpp eigen opencv g2o pangolin \
-    yaml_cpp_temp eigen_temp opencv_temp g2o_temp pangolin_temp
+RUN mkdir yaml-cpp eigen opencv g2o pangolin \
+    yaml-cpp_temp eigen_temp opencv_temp g2o_temp pangolin_temp
 
-RUN wget -O yaml_cpp_temp.tar.gz https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz \
-    && tar -xzf yaml_cpp_temp.tar.gz -C yaml_cpp_temp --strip-components=1 \
-    && mkdir yaml_cpp_temp/build \
-    && cd yaml_cpp_temp/build \
-    && cmake .. -DCMAKE_INSTALL_PREFIX="/vslam/thirdparty/yaml_cpp" \
+RUN wget -O yaml-cpp_temp.tar.gz https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz \
+    && tar -xzf yaml-cpp_temp.tar.gz -C yaml-cpp_temp --strip-components=1 \
+    && mkdir yaml-cpp_temp/build \
+    && cd yaml-cpp_temp/build \
+    && cmake .. -DCMAKE_INSTALL_PREFIX="/vslam/thirdparty/yaml-cpp" \
     && make install -j$(nproc) \
     && cd "/vslam/thirdparty" \
-    && rm -rf yaml_cpp_temp yaml_cpp_temp.tar.gz
+    && rm -rf yaml-cpp_temp yaml-cpp_temp.tar.gz
 
 RUN wget -O eigen_temp.tar.gz https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz \
     && tar -xzf eigen_temp.tar.gz -C eigen_temp --strip-components=1\
