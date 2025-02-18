@@ -1,3 +1,9 @@
 #include "vslam.h"
+ 
+int main() {
+  
+  VSLAM vslam;
+  vslam.run(); 
 
-int main() { return 0; }
+  return 0; 
+}

@@ -20,6 +20,7 @@ endif()
 include_directories(include)
 add_library(slam STATIC 
     src/vslam.cpp
+    src/settings.cpp
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
