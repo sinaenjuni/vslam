@@ -21,6 +21,10 @@ include_directories(include)
 add_library(slam STATIC 
     src/vslam.cpp
     src/settings.cpp
+    src/misc.cpp
+    src/camera.cpp
+    src/feature.cpp
+    src/octree.cpp
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")

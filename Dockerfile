@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libepoxy-dev \
     libeigen3-dev libspdlog-dev libsuitesparse-dev qtdeclarative5-dev \
     qt5-qmake libqglviewer-dev-qt5 \
+    libgtk2.0-dev libgtk-3-dev pkg-config \
+    # opencv gui dependencies
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /vslam/thirdparty
