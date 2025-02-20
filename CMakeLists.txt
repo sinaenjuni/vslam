@@ -25,6 +25,7 @@ add_library(slam STATIC
     src/camera.cpp
     src/feature.cpp
     src/octree.cpp
+    src/frame.cpp
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
