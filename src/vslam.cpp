@@ -8,17 +8,14 @@ VSLAM::VSLAM()
   this->settings.print();
 
   this->camera = Camera(
-      this->settings.fx, this->settings.fy, this->settings.cx,
-      this->settings.cy, this->settings.bf, this->settings.width,
-      this->settings.height);
+      this->settings.fx, this->settings.fy, this->settings.cx, this->settings.cy, this->settings.bf,
+      this->settings.width, this->settings.height);
 
   this->feature_extractor = new FAST_ORB_extractor(
-      this->settings.n_points, this->settings.n_levels, this->settings.width,
-      this->settings.height, this->settings.scale2_factors,
-      this->settings.scale2inv_factors);
+      this->settings.n_points, this->settings.n_levels, this->settings.width, this->settings.height,
+      this->settings.scale2_factors, this->settings.scale2inv_factors);
 
-  this->feature_matcher =
-      new BFMatcher(cv::BFMatcher::create(cv::NORM_HAMMING, false));
+  this->feature_matcher = new BFMatcher(cv::BFMatcher::create(cv::NORM_HAMMING, false));
 }
 
 VSLAM::~VSLAM() {}
@@ -56,21 +53,19 @@ void VSLAM::run()
       continue;
     }
 
-    cv::Mat idx_match_cur, idx_match_ref;
-    this->feature_matcher->feature_matching(
-        frame, last_frame, idx_match_cur, idx_match_ref);
+    // cv::Mat idx_match_cur, idx_match_ref;
+    // this->feature_matcher->feature_matching(
+    //     frame, last_frame, idx_match_cur, idx_match_ref);
 
-    cv::Mat Rwc, twc;
-    Geometry::pose_estimation_with_essential_matrix(
-        frame, last_frame, idx_match_cur, idx_match_ref, Rwc, twc);
-    frame->set_Twc(Rwc, twc);
-
-    
+    // cv::Mat Rwc, twc;
+    // Geometry::pose_estimation_with_essential_matrix(
+    //     frame, last_frame, idx_match_cur, idx_match_ref, Rwc, twc);
+    // frame->set_Twc(Rwc, twc);
 
     Misc::draw_kps(view_img, kps);
     cv::imshow("image", view_img);
     // int key = cv::waitKey(1e3/30);
-    int key = cv::waitKey();
+    int key = cv::waitKey(1);
     if (key == 32) key = cv::waitKey();  // Space
     if (key == 27) break;                // ESC
   }

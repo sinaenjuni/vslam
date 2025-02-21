@@ -26,6 +26,7 @@ add_library(slam STATIC
     src/feature.cpp
     src/octree.cpp
     src/frame.cpp
+    src/viewer3d.cpp
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
@@ -62,6 +63,7 @@ find_package(Pangolin 0.9.2 EXACT REQUIRED PATHS "thirdparty/pangolin")
 if(Pangolin_FOUND)
     message("Pangolin ${Pangolin_VERSION} found")
     target_link_libraries(slam PUBLIC ${Pangolin_LIBRARY})
+    
 endif()
 
 

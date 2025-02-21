@@ -2,6 +2,7 @@
 #include "feature.h"
 #include "misc.h"
 #include "settings.h"
+#include "viewer3d.h"
 
 class VSLAM
 {
