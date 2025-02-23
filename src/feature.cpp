@@ -1,7 +1,27 @@
 #include "feature.h"
 
-#include "frame.h"
+#include "key_frame.h"
 #include "octree.h"
+
+FAST_ORB_extractor::FAST_ORB_extractor(Settings settings)
+    : n_points(settings.n_points),
+      n_levels(settings.n_levels),
+      width(settings.width),
+      height(settings.height),
+      scale2_factors(settings.scale2_factors),
+      scale2inv_factors(settings.scale2inv_factors),
+      descriptor(cv::ORB::create())
+{
+  // reserve() function doesn't set the vector size.
+  img_pyramid.resize(n_levels);
+  img_pyramid[0] = cv::Mat::zeros(height, width, CV_8UC1);
+  for (size_t i = 1; i < n_levels; i++)
+  {
+    // resize using scale factor
+    cv::resize(
+        img_pyramid[0], img_pyramid[i], cv::Size(), scale2inv_factors[i], scale2inv_factors[i]);
+  }
+}
 
 FAST_ORB_extractor::FAST_ORB_extractor(
     int n_points,
@@ -25,20 +45,18 @@ FAST_ORB_extractor::FAST_ORB_extractor(
   {
     // resize using scale factor
     cv::resize(
-        img_pyramid[0], img_pyramid[i], cv::Size(), scale2inv_factors[i],
-        scale2inv_factors[i]);
+        img_pyramid[0], img_pyramid[i], cv::Size(), scale2inv_factors[i], scale2inv_factors[i]);
   }
 }
 
 FAST_ORB_extractor::~FAST_ORB_extractor() {}
 
 void FAST_ORB_extractor::detect_with_octave(
-    cv::Mat &img, std::vector<cv::KeyPoint> &kps, int octave)
+    const cv::Mat &img, std::vector<cv::KeyPoint> &kps, int octave)
 {
   // std::vector<cv::KeyPoint> kps;
   cv::resize(
-      img, img_pyramid[octave], cv::Size(), scale2inv_factors[octave],
-      scale2inv_factors[octave]);
+      img, img_pyramid[octave], cv::Size(), scale2inv_factors[octave], scale2inv_factors[octave]);
   // detector->detect(img_pyramid[octave], kps);
   cv::FAST(img_pyramid[octave], kps, 20, true);
 
@@ -50,19 +68,19 @@ void FAST_ORB_extractor::detect_with_octave(
   }
 }
 
-void FAST_ORB_extractor::detect(cv::Mat &img, std::vector<cv::KeyPoint> &kps)
+void FAST_ORB_extractor::detect(const cv::Mat &img, std::vector<cv::KeyPoint> &kps)
 {
   for (size_t i = 0; i < n_levels; i++)
   {
-    std::vector<cv::KeyPoint> temp_kps;
-    detect_with_octave(img, temp_kps, i);
-    kps.insert(kps.end(), temp_kps.begin(), temp_kps.end());
+    std::vector<cv::KeyPoint> octave_kps;
+    detect_with_octave(img, octave_kps, i);
+    kps.insert(kps.end(), octave_kps.begin(), octave_kps.end());
   }
   Octree::rectify_kps(kps, n_points, 0, 0, width, height);
 }
 
 void FAST_ORB_extractor::detect_and_compute(
-    cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc)
+    const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc)
 {
   detect(img, kps);
   descriptor->compute(img, kps, desc);
@@ -80,16 +98,15 @@ double_t FAST_ORB_extractor::get_scale2(const int octave) const
 
 BFMatcher::BFMatcher(cv::Ptr<cv::BFMatcher> matcher) : matcher(matcher) {}
 BFMatcher::~BFMatcher() {}
-void BFMatcher::feature_matching(
-    const Frame *query,
-    const Frame *train,
+void BFMatcher::compute_match(
+    const Key_frame *query,
+    const Key_frame *train,
     cv::Mat &idx_match_query,
     cv::Mat &idx_match_train)
 {
   std::vector<std::vector<cv::DMatch>> matches;
-  matcher->knnMatch(
-      query->get_descriptor(), train->get_descriptor(), matches, 2);
-  // PRINT(frame->des.size(), last_frame->des.size(), matches.size());
+  matcher->knnMatch(query->get_descriptor(), train->get_descriptor(), matches, 2);
+  // PRINT(query->get_descriptor().size(), train->get_descriptor().size(), matches.size());
   // cv::Mat idx_cur(0, 0, CV_16U), idx_ref(0, 0, CV_16U);
   idx_match_query.create(0, 0, CV_16U);
   idx_match_train.create(0, 0, CV_16U);
@@ -140,8 +157,8 @@ namespace Geometry
 // Calculate T(transformation matrix) from a points2 to a points1
 // resultly, can get a T12 matrix
 void pose_estimation_with_essential_matrix(
-    Frame const *const frame1,
-    Frame const *const frame2,
+    Key_frame const *const frame1,
+    Key_frame const *const frame2,
     cv::Mat &idx_match1,
     cv::Mat &idx_match2,
     cv::Mat &R,
@@ -178,8 +195,8 @@ void pose_estimation_with_essential_matrix(
 }
 
 cv::Mat triangulate(
-    Frame const *const frame1,
-    Frame const *const frame2,
+    Key_frame const *const frame1,
+    Key_frame const *const frame2,
     const cv::Mat idx_match1,
     const cv::Mat idx_match2)
 {

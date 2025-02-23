@@ -3,24 +3,34 @@
 #include "misc.h"
 
 Camera::Camera() {}
-Camera::Camera(
-    double fx,
-    double fy,
-    double cx,
-    double cy,
-    double bf,
-    int width,
-    int height)
+Camera::Camera(Settings settings)
+    : fx(settings.fx),
+      fy(settings.fy),
+      cx(settings.cx),
+      cy(settings.cy),
+      bf(settings.bf),
+      width(settings.width),
+      height(settings.height)
+{
+  // clang-format off
+  K = (cv::Mat_<double>(3, 3) << fx, 0, cx, 
+                                  0, fy, cy, 
+                                  0, 0, 1);
+  // clang-format on
+  Kinv = K.inv();
+  Kinv /= Kinv.at<double>(2, 2);  // Kinv normalization
+}
+Camera::Camera(double fx, double fy, double cx, double cy, double bf, int width, int height)
     : fx(fx), fy(fy), cx(cx), cy(cy), bf(bf), width(width), height(height)
 {
   K = (cv::Mat_<double>(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
   Kinv = K.inv();
-  Kinv /= Kinv.at<double>(2, 2);  // Kinv noramz
+  Kinv /= Kinv.at<double>(2, 2);  // Kinv normalization
 }
 
 Camera::~Camera() {}
 
-void Camera::unproject(const cv::Mat &kps, cv::Mat &kpsn)
+void Camera::unproject(const cv::Mat &kps, cv::Mat &kpsn) const
 {
   // Coordinates translation from the image coordinates to the normalized camera
   // ones.
@@ -30,7 +40,7 @@ void Camera::unproject(const cv::Mat &kps, cv::Mat &kpsn)
   kpsn = kps_homo.colRange(0, 2);
 }
 
-void Camera::project(const cv::Mat &kpsn, cv::Mat &kps, cv::Mat &depth)
+void Camera::project(const cv::Mat &kpsn, cv::Mat &kps, cv::Mat &depth) const
 {
   // Convert from the normalized camera coordinates to the image ones.
   cv::Mat kpsn_homo;

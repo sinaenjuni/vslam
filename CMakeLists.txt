@@ -19,14 +19,19 @@ endif()
 
 include_directories(include)
 add_library(slam STATIC 
-    src/vslam.cpp
-    src/settings.cpp
     src/misc.cpp
+    src/settings.cpp
     src/camera.cpp
+   
+    src/map_point.cpp
+    src/key_frame.cpp
+    src/map.cpp
+    src/viewer3d.cpp
+   
     src/feature.cpp
     src/octree.cpp
-    src/frame.cpp
-    src/viewer3d.cpp
+    src/vslam.cpp
+
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")

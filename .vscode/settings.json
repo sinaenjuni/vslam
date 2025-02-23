@@ -10,4 +10,5 @@
     "C_Cpp.autocomplete": "disabled",
     "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.path": "/usr/lib/llvm-12/bin/clangd",
+
 }

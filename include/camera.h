@@ -2,6 +2,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "settings.h"
+
 class Camera
 {
  private:
@@ -13,16 +15,10 @@ class Camera
 
  public:
   Camera();
-  Camera(
-      double fx,
-      double fy,
-      double cx,
-      double cy,
-      double bf,
-      int width,
-      int height);
+  Camera(Settings settings);
+  Camera(double fx, double fy, double cx, double cy, double bf, int width, int height);
   ~Camera();
 
-  void unproject(const cv::Mat &kps, cv::Mat &kpsn);
-  void project(const cv::Mat &kpsn, cv::Mat &kps, cv::Mat &depth);
+  void unproject(const cv::Mat &kps, cv::Mat &kpsn) const;
+  void project(const cv::Mat &kpsn, cv::Mat &kps, cv::Mat &depth) const;
 };

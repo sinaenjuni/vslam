@@ -10,11 +10,19 @@ void to_homogeneous(const cv::Mat &input, cv::Mat &output)
   // A last element in a homogeneous coordinate is 1
   input.copyTo(output.colRange(0, input.cols));
 }
+
+cv::Mat slice_cvmat(const cv::Mat &input, const cv::Mat &indices)
+{
+  cv::Mat ret = cv::Mat::zeros(indices.rows, input.cols, input.depth());
+  indices.forEach<uint16_t>([&ret, &input](const uint16_t &value, const int *position)
+                            { input.row(value).copyTo(ret.row(position[0])); });
+  return ret;
+}
 }  // namespace Matrix
 
 namespace Misc
 {
-void draw_kps(cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Scalar color)
+void draw_kps(const cv::Mat &img, const std::vector<cv::KeyPoint> &kps, const cv::Scalar color)
 {
   for (auto &kp : kps)
   {
@@ -22,38 +30,22 @@ void draw_kps(cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Scalar color)
   }
 }
 
-void draw_kps(cv::Mat &img, cv::Mat &kps, cv::Scalar color)
+void draw_kps(const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
 {
   for (size_t i = 0; i < kps.rows; i++)
   {
-    cv::circle(
-        img, static_cast<cv::Point2f>(kps.row(i)), 2, color, -1, cv::LINE_AA);
+    cv::circle(img, static_cast<cv::Point2f>(kps.row(i)), 2, color, -1, cv::LINE_AA);
   }
 }
 
-void draw_line(
-    cv::Mat &img,
-    const cv::Mat kps_cur,
-    const cv::Mat kps_ref,
-    cv::Scalar color)
+void draw_line(cv::Mat &img, const cv::Mat kps_cur, const cv::Mat kps_ref, cv::Scalar color)
 {
   for (size_t i = 0; i < kps_cur.rows; i++)
   {
     cv::line(
         img, cv::Point2d(kps_cur.at<double>(i, 0), kps_cur.at<double>(i, 1)),
-        cv::Point2d(kps_ref.at<double>(i, 0), kps_ref.at<double>(i, 1)), color,
-        1, cv::LINE_AA);
+        cv::Point2d(kps_ref.at<double>(i, 0), kps_ref.at<double>(i, 1)), color, 1, cv::LINE_AA);
   }
 }
-cv::Mat slice_matrix(const cv::Mat &matrix, const cv::Mat &indices)
-{
-  // CV_16F
-  // cv::Mat ret = cv::Mat::zeros(indices.rows, matrix.cols, matrix.type());
-  // indices.forEach(
-  //     [&ret]()->void{
 
-  //     }
-  // );
-  return cv::Mat();
-}
 }  // namespace Misc

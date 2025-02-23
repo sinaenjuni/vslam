@@ -1,5 +1,7 @@
 #include "viewer3d.h"
 
+#include <pangolin/gl/gldraw.h>
+
 #include <algorithm>
 #include <mutex>
 #include <vector>
@@ -53,7 +55,7 @@ Viewer3D::Viewer3D() : is_running(true)
   //   ));
 
   //   map_points.push_back(
-  //     Map_point_dao(
+  // Map_point_dao(
   //       1.0, 1.0, 1.0,
   //         Color(0.0, 0.0, 1.0)
   //     )
@@ -132,24 +134,22 @@ void Viewer3D::run()
               -static_cast<double>(this->window_width) / static_cast<double>(this->window_height))
           .SetHandler(&handler);
 
-  // glPointSize(10);
-  // Eigen::Matrix3d K;
-  // K << 718.856, 0, 607.1928, 0, 718.856, 185.2157, 0, 0, 1;
-  // Eigen::Matrix3d Kinv = K.inverse();
+  glPointSize(10);
+  Eigen::Matrix3d K;
+  K << 718.856, 0, 607.1928, 0, 718.856, 185.2157, 0, 0, 1;
+  Eigen::Matrix3d Kinv = K.inverse();
   while (!pangolin::ShouldQuit() && this->is_running)
   {
     // Clear screen and activate view to render into
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     d_cam.Activate(s_cam);
 
-    // pangolin::glDrawAxis(10);
+    pangolin::glDrawAxis(1);
     // pangolin::glDrawFrustum(Kinv, 1241, 376, 1.0);
-    pangolin::glDrawColouredCube();
 
-    // for (Key_frame_dao &key_frame : this->key_frames)
+    // for (Key_frame_DO &key_frame : this->key_frames)
     // {
-    //   glColor3f(
-    //       key_frame.color.red, key_frame.color.green, key_frame.color.blue);
+    //   glColor3f(key_frame.color.red, key_frame.color.green, key_frame.color.blue);
     //   pangolin::glDrawFrustum(Kinv, 1241, 376, key_frame.Twc, 1.0);
     //   s_cam.Follow(key_frame.Twc, true);
     // }
@@ -163,6 +163,7 @@ void Viewer3D::run()
     //   // glVertex3f(1.0,1.0,1.0);
     //   // PRINT(map_point.x, map_point.x, map_point.z);
     // }
+    // glVertex3f(1.0, 1.0, 1.0);
     // glEnd();
 
     // Swap frames and Process Events
