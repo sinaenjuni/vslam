@@ -1,15 +1,19 @@
 #include "feature.h"
 
+#include <opencv2/core/hal/interface.h>
+
+#include "camera.h"
 #include "key_frame.h"
 #include "octree.h"
 
-FAST_ORB_extractor::FAST_ORB_extractor(Settings settings)
+FAST_ORB_extractor::FAST_ORB_extractor(Settings settings, Camera *camera)
     : n_points(settings.n_points),
       n_levels(settings.n_levels),
       width(settings.width),
       height(settings.height),
       scale2_factors(settings.scale2_factors),
       scale2inv_factors(settings.scale2inv_factors),
+      camera(camera),
       descriptor(cv::ORB::create())
 {
   // reserve() function doesn't set the vector size.
@@ -86,6 +90,39 @@ void FAST_ORB_extractor::detect_and_compute(
   descriptor->compute(img, kps, desc);
 }
 
+Key_frame *FAST_ORB_extractor::extract(const cv::Mat &img)
+{
+  Key_frame *key_frame = new Key_frame();
+  std::vector<cv::KeyPoint> pts;
+  cv::Mat descriptor;
+  this->detect_and_compute(img, pts, descriptor);
+  key_frame->set_descriptor(descriptor);
+
+  int nkps = pts.size();
+  cv::Mat kps(nkps, 2, CV_64F);
+  cv::Mat kpsn(nkps, 2, CV_64F);
+  cv::Mat octave(nkps, 1, CV_16F);
+  cv::Mat sigma2(nkps, 1, CV_64F);
+  cv::Mat sigma2inv(nkps, 1, CV_64F);
+
+  for (size_t i = 0; i < nkps; i++)
+  {
+    kps.at<double>(i, 0) = pts[i].pt.x;
+    kps.at<double>(i, 1) = pts[i].pt.y;
+
+    octave.at<uint8_t>(i) = pts[i].octave;
+
+    sigma2.at<double_t>(i) = this->get_scale2(pts[i].octave);
+    sigma2inv.at<double_t>(i) = this->get_scale2inv(pts[i].octave);
+  }
+
+  // key_frame->get_kps().create(nkps, 2, CV_64F);
+  this->camera->unproject(kps, kpsn);
+  key_frame->set_kps(kps, kpsn, octave, sigma2, sigma2inv);
+
+  return key_frame;
+}
+
 double_t FAST_ORB_extractor::get_scale2inv(const int octave) const
 {
   return this->scale2inv_factors[octave];
@@ -99,13 +136,10 @@ double_t FAST_ORB_extractor::get_scale2(const int octave) const
 BFMatcher::BFMatcher(cv::Ptr<cv::BFMatcher> matcher) : matcher(matcher) {}
 BFMatcher::~BFMatcher() {}
 void BFMatcher::compute_match(
-    const Key_frame *query,
-    const Key_frame *train,
-    cv::Mat &idx_match_query,
-    cv::Mat &idx_match_train)
+    const cv::Mat &query, const cv::Mat &train, cv::Mat &idx_match_query, cv::Mat &idx_match_train)
 {
   std::vector<std::vector<cv::DMatch>> matches;
-  matcher->knnMatch(query->get_descriptor(), train->get_descriptor(), matches, 2);
+  matcher->knnMatch(query, train, matches, 2);
   // PRINT(query->get_descriptor().size(), train->get_descriptor().size(), matches.size());
   // cv::Mat idx_cur(0, 0, CV_16U), idx_ref(0, 0, CV_16U);
   idx_match_query.create(0, 0, CV_16U);
@@ -151,63 +185,3 @@ void BFMatcher::compute_match(
     throw std::length_error("Not valid index length.");
   }
 }
-
-namespace Geometry
-{
-// Calculate T(transformation matrix) from a points2 to a points1
-// resultly, can get a T12 matrix
-void pose_estimation_with_essential_matrix(
-    Key_frame const *const frame1,
-    Key_frame const *const frame2,
-    cv::Mat &idx_match1,
-    cv::Mat &idx_match2,
-    cv::Mat &R,
-    cv::Mat &t)
-{
-  cv::Mat points1(frame1->get_kpsn(idx_match1));
-  cv::Mat points2(frame2->get_kpsn(idx_match2));
-
-  cv::Mat E, inlier;
-  // Calculate a transformation matrix from the points1 to the points`2.
-  E = cv::findEssentialMat(
-      points2, points1, 1.0, cv::Point2d(0, 0),
-      // cv::RANSAC, 0.999, 0.0004, inlier);
-      cv::RANSAC, 0.999, 0.004, inlier);
-  // PRINT(E);
-
-  // cv::Mat R, t;
-  cv::recoverPose(E, points2, points1, R, t, 1.0, cv::Point2d(0, 0), inlier);
-  // PRINT(R);
-  // PRINT(t);
-
-  cv::Mat inlier1(0, 0, CV_16U), inlier2(0, 0, CV_16U);
-  for (size_t i = 0; i < inlier.rows; i++)
-  {
-    if (inlier.at<uchar>(i) == 1)
-    {
-      inlier1.push_back(idx_match1.row(i));
-      inlier2.push_back(idx_match2.row(i));
-    }
-  }
-
-  inlier1.copyTo(idx_match1);
-  inlier2.copyTo(idx_match2);
-}
-
-cv::Mat triangulate(
-    Key_frame const *const frame1,
-    Key_frame const *const frame2,
-    const cv::Mat idx_match1,
-    const cv::Mat idx_match2)
-{
-  cv::Mat points4d;
-  cv::triangulatePoints(
-      frame1->get_P(), frame2->get_P(), frame1->get_kpsn(idx_match1).t(),
-      frame2->get_kpsn(idx_match2).t(), points4d);
-  points4d = points4d.t();
-  points4d = points4d / cv::repeat(points4d.col(3), 1, 4);
-
-  // return points4d.colRange(0, 3);
-  return points4d;
-}
-}  // namespace Geometry

@@ -1,19 +1,15 @@
 #include "camera.h"
 #include "feature.h"
+#include "geometry.h"
+#include "key_frame.h"
+#include "map.h"
+#include "map_point.h"
 #include "misc.h"
 #include "settings.h"
+#include "tracker.h"
 #include "viewer3d.h"
 
-class VSLAM
+namespace VSLAM
 {
- private:
-  Settings settings;
-  Camera camera;
-  IFeature_extractor *feature_extractor;
-  IFeature_matcher *feature_matcher;
-
- public:
-  VSLAM();
-  ~VSLAM();
-  void run();
+void run();
 };

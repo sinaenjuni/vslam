@@ -6,6 +6,8 @@
 #include <mutex>
 #include <vector>
 
+#include "map.h"
+
 Viewer3D::Viewer3D() : is_running(true)
 {
   // Define Projection and initial ModelView matrix
@@ -134,7 +136,7 @@ void Viewer3D::run()
               -static_cast<double>(this->window_width) / static_cast<double>(this->window_height))
           .SetHandler(&handler);
 
-  glPointSize(10);
+  glPointSize(3);
   Eigen::Matrix3d K;
   K << 718.856, 0, 607.1928, 0, 718.856, 185.2157, 0, 0, 1;
   Eigen::Matrix3d Kinv = K.inverse();
@@ -147,24 +149,25 @@ void Viewer3D::run()
     pangolin::glDrawAxis(1);
     // pangolin::glDrawFrustum(Kinv, 1241, 376, 1.0);
 
-    // for (Key_frame_DO &key_frame : this->key_frames)
-    // {
-    //   glColor3f(key_frame.color.red, key_frame.color.green, key_frame.color.blue);
-    //   pangolin::glDrawFrustum(Kinv, 1241, 376, key_frame.Twc, 1.0);
-    //   s_cam.Follow(key_frame.Twc, true);
-    // }
+    for (Key_frame *key_frame : this->map->get_key_frames())
+    {
+      // glColor3f(key_frame.color.red, key_frame.color.green, key_frame.color.blue);
+      // glColor3f(1., 1., 1.);
+      pangolin::glDrawFrustum(Kinv, 1241, 376, key_frame->get_Twc().to_eigen(), 1.0);
+      s_cam.Follow(key_frame->get_Twc().to_eigen(), true);
+    }
 
-    // glBegin(GL_POINTS);
-    // for (Map_point_dao &map_point : this->map_points)
-    // {
-    //   glColor3f(
-    //       map_point.color.red, map_point.color.green, map_point.color.blue);
-    //   glVertex3d(map_point.x, map_point.x, map_point.z);
-    //   // glVertex3f(1.0,1.0,1.0);
-    //   // PRINT(map_point.x, map_point.x, map_point.z);
-    // }
-    // glVertex3f(1.0, 1.0, 1.0);
-    // glEnd();
+    glBegin(GL_POINTS);
+    for (Map_point *map_point : this->map->get_map_points())
+    {
+      // glColor3f(map_point.color.red, map_point.color.green, map_point.color.blue);
+      PosF pos = map_point->get_position();
+      glVertex3d(pos.x, pos.y, pos.z);
+      // glVertex3f(1.0,1.0,1.0);
+      // PRINT(map_point.x, map_point.x, map_point.z);
+    }
+    glVertex3f(1.0, 1.0, 1.0);
+    glEnd();
 
     // Swap frames and Process Events
     pangolin::FinishFrame();

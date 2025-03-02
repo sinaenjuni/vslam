@@ -12,7 +12,7 @@ int get_frame_id()
 
 Key_frame::Key_frame() : id(get_frame_id()) {}
 
-Key_frame::Key_frame(const cv::Mat &img, Camera &camera, IFeature_extractor *feature_extractor)
+Key_frame::Key_frame(const cv::Mat &img, Camera &camera, FAST_ORB_extractor *feature_extractor)
     : Key_frame()
 {
   std::vector<cv::KeyPoint> pts;
@@ -22,14 +22,17 @@ Key_frame::Key_frame(const cv::Mat &img, Camera &camera, IFeature_extractor *fea
   this->kps.create(nkps, 2, CV_64F);
   this->octave.create(nkps, 1, CV_16U);
 
+  this->sigma2.create(pts.size(), 1, CV_64F);
+  this->sigma2inv.create(pts.size(), 1, CV_64F);
+
   for (size_t i = 0; i < nkps; i++)
   {
     this->kps.at<double>(i, 0) = pts[i].pt.x;
     this->kps.at<double>(i, 1) = pts[i].pt.y;
     // octave[i] = kps[i].octave;
     this->octave.at<uint8_t>(i) = pts[i].octave;
-    // sigma2.at<double_t>(i) = detector.get_scale2(pts[i].octave);
-    // sigma2inv.at<double_t>(i) = detector.get_scale2inv(pts[i].octave);
+    sigma2.at<double_t>(i) = feature_extractor->get_scale2(pts[i].octave);
+    sigma2inv.at<double_t>(i) = feature_extractor->get_scale2inv(pts[i].octave);
   }
 
   this->kpsn.create(nkps, 2, CV_64F);
@@ -69,10 +72,10 @@ Key_frame::~Key_frame() {}
 //   // camera->project(camera_coordinate_points.colRange(0, 3), kps, depth);
 // }
 
-void Key_frame::project_word2camera(const cv::Mat &points4d, cv::Mat &kpsn) const
-{
-  kpsn = (this->Twc * points4d.t()).t();
-}
+// void Key_frame::project_word2camera(const cv::Mat &points4d, cv::Mat &kpsn) const
+// {
+// kpsn = (this->Twc.to_cvmat() * points4d.t()).t();
+// }
 
 // void Key_frame::project_camera2image(
 //     const cv::Mat &points3d, cv::Mat &kpsi, cv::Mat &depth) const
@@ -88,43 +91,28 @@ void Key_frame::project_word2camera(const cv::Mat &points4d, cv::Mat &kpsn) cons
 //   kpsw = (Rwc * kpsn_homo.t()).t();
 // }
 
-const cv::Mat Key_frame::get_kps(const cv::Mat &indices) const
-{
-  // PRINT(this->kps.rows, this->kps.cols, this->kps.depth(), CV_64F);
-  cv::Mat ret = cv::Mat::zeros(indices.rows, this->kps.cols, this->kps.depth());
-  // PRINT(ret.rows, ret.cols, ret.depth(), CV_64F);
+// const cv::Mat Key_frame::get_kpsn(const cv::Mat &indices) const
+// {
+//   cv::Mat ret = cv::Mat::zeros(indices.rows, this->kpsn.cols, this->kpsn.depth());
+//   for (size_t i = 0; i < indices.rows; i++)
+//   {
+//     ret.at<double_t>(i, 0) = this->kpsn.at<double_t>(indices.at<uint16_t>(i, 0), 0);
+//     ret.at<double_t>(i, 1) = this->kpsn.at<double_t>(indices.at<uint16_t>(i, 0), 1);
+//   }
 
-  for (size_t i = 0; i < indices.rows; i++)
-  {
-    ret.at<double_t>(i, 0) = this->kps.at<double_t>(indices.at<uint16_t>(i, 0), 0);
-    ret.at<double_t>(i, 1) = this->kps.at<double_t>(indices.at<uint16_t>(i, 0), 1);
-  }
+//   return ret;
+// }
 
-  return ret;
-}
-
-const cv::Mat Key_frame::get_kpsn(const cv::Mat &indices) const
-{
-  cv::Mat ret = cv::Mat::zeros(indices.rows, this->kpsn.cols, this->kpsn.depth());
-  for (size_t i = 0; i < indices.rows; i++)
-  {
-    ret.at<double_t>(i, 0) = this->kpsn.at<double_t>(indices.at<uint16_t>(i, 0), 0);
-    ret.at<double_t>(i, 1) = this->kpsn.at<double_t>(indices.at<uint16_t>(i, 0), 1);
-  }
-
-  return ret;
-}
-
-const cv::Mat Key_frame::get_octave(const cv::Mat &indices) const
-{
-  cv::Mat ret = cv::Mat::zeros(indices.rows, this->octave.cols, this->octave.depth());
-  for (size_t i = 0; i < indices.rows; i++)
-  {
-    ret.at<uint16_t>(i) = this->kpsn.at<uint16_t>(indices.at<uint16_t>(i));
-    ret.at<uint16_t>(i) = this->kpsn.at<uint16_t>(indices.at<uint16_t>(i));
-  }
-  return ret;
-}
+// const cv::Mat Key_frame::get_octave(const cv::Mat &indices) const
+// {
+//   cv::Mat ret = cv::Mat::zeros(indices.rows, this->octave.cols, this->octave.depth());
+//   for (size_t i = 0; i < indices.rows; i++)
+//   {
+//     ret.at<uint16_t>(i) = this->kpsn.at<uint16_t>(indices.at<uint16_t>(i));
+//     ret.at<uint16_t>(i) = this->kpsn.at<uint16_t>(indices.at<uint16_t>(i));
+//   }
+//   return ret;
+// }
 
 // const cv::Mat Key_frame::get_sigma2inv(const cv::Mat &indices) const
 // {

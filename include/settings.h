@@ -2,7 +2,8 @@
 #include <iostream>
 #include <vector>
 
-struct Settings {
+struct Settings
+{
   std::string sensor_type;
   // camera information
   int width;
@@ -26,6 +27,7 @@ struct Settings {
   double scale_factor;
   std::vector<double> scale2_factors;
   std::vector<double> scale2inv_factors;
+  int max_tracking_size;
 
   // optimization
   double kChi2Mono;

@@ -1,9 +1,12 @@
 #include "settings.h"
-#include <fstream>
-#include <iomanip>
+
 #include <yaml-cpp/yaml.h>
 
-void Settings::print() const {
+#include <fstream>
+#include <iomanip>
+
+void Settings::print() const
+{
   std::cout << "Settings:"
             << "\n";
   std::cout << "Sensor Type: " << sensor_type << "\n";
@@ -34,17 +37,20 @@ void Settings::print() const {
   std::cout << "  Number of Points: " << n_points << "\n";
   std::cout << "  Feature Size: " << feature_size << "\n";
   std::cout << "  Scale Factor: " << scale_factor << "\n";
+  std::cout << "  Max_tracking_size: " << max_tracking_size << "\n";
 
   std::cout << "  Scale Factors: "
             << "\n";
-  for (const auto &factor : scale2_factors) {
+  for (const auto &factor : scale2_factors)
+  {
     std::cout << std::fixed << std::setprecision(6) << factor << " ";
   }
   std::cout << "\n";
 
   std::cout << "  Inverse Scale Factors: "
             << "\n";
-  for (const auto &factor : scale2inv_factors) {
+  for (const auto &factor : scale2inv_factors)
+  {
     std::cout << std::fixed << std::setprecision(6) << factor << " ";
   }
   std::cout << "\n";
@@ -54,31 +60,36 @@ void Settings::print() const {
   std::cout << "  Chi2 Mono: " << kChi2Mono << "\n";
   std::cout << "  Chi2 Stereo: " << kChi2Stereo << "\n";
   std::cout << "  Cosine Max Parallax: " << cos_max_parallax << "\n";
-  std::cout << "  Scale Consistency Factor: " << scale_consistency_factor
-            << "\n";
+  std::cout << "  Scale Consistency Factor: " << scale_consistency_factor << "\n";
   std::cout << "  Desired Median Depth: " << desired_median_depth << "\n";
 }
 
-Settings prase_settings(const std::string &yaml_file_path) {
+Settings prase_settings(const std::string &yaml_file_path)
+{
   // try {
   YAML::Node yaml_file;
-  try {
+  try
+  {
     yaml_file = YAML::LoadFile(yaml_file_path);
-  } catch (const YAML::Exception &e) {
+  }
+  catch (const YAML::Exception &e)
+  {
     std::cerr << "Error: YAML file " << e.what() << "\n";
     std::exit(EXIT_FAILURE);
   }
   Settings settings;
   settings.timestamp_path = yaml_file["timestamp_path"].as<std::string>();
   std::ifstream file(settings.timestamp_path);
-  if (!file.is_open()) {
+  if (!file.is_open())
+  {
     std::cerr << "Error: timestemp file cant load."
               << "\n";
     std::exit(EXIT_FAILURE);
   }
 
   std::string line;
-  while (std::getline(file, line)) {
+  while (std::getline(file, line))
+  {
     // std::cout << std::stod(line) << " " << std::stof(line) << "\n";
     settings.timestamp.push_back(std::stof(line));
   }
@@ -90,8 +101,10 @@ Settings prase_settings(const std::string &yaml_file_path) {
   settings.scale_factor = yaml_file["scale_factor"].as<double>();
   settings.scale2_factors.resize(settings.n_levels);
   settings.scale2inv_factors.resize(settings.n_levels);
+  settings.max_tracking_size = yaml_file["max_tracking_size"].as<int>();
 
-  for (size_t i = 0; i < settings.n_levels; i++) {
+  for (size_t i = 0; i < settings.n_levels; i++)
+  {
     settings.scale2_factors[i] = std::pow(settings.scale_factor, i);
     settings.scale2inv_factors[i] = 1 / settings.scale2_factors[i];
   }
@@ -112,8 +125,7 @@ Settings prase_settings(const std::string &yaml_file_path) {
   settings.kChi2Mono = yaml_file["kChi2Mono"].as<double>();
   settings.kChi2Stereo = yaml_file["kChi2Stereo"].as<double>();
   settings.cos_max_parallax = yaml_file["cos_max_parallax"].as<double>();
-  settings.scale_consistency_factor =
-      yaml_file["scale_consistency_factor"].as<double>();
+  settings.scale_consistency_factor = yaml_file["scale_consistency_factor"].as<double>();
   settings.desired_median_depth = yaml_file["desired_median_depth"].as<int>();
 
   return settings;

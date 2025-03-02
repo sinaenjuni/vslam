@@ -22,15 +22,19 @@ add_library(slam STATIC
     src/misc.cpp
     src/settings.cpp
     src/camera.cpp
-   
+    src/geometry.cpp
+    src/optimization.cpp
+    
     src/map_point.cpp
     src/key_frame.cpp
     src/map.cpp
     src/viewer3d.cpp
    
-    src/feature.cpp
     src/octree.cpp
+    src/feature.cpp
+    src/tracker.cpp    
     src/vslam.cpp
+
 
 )
 

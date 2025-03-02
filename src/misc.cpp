@@ -2,20 +2,37 @@
 
 namespace Matrix
 {
-void to_homogeneous(const cv::Mat &input, cv::Mat &output)
+// void to_homogeneous(const cv::Mat &input, cv::Mat &output)
+// {
+//   output.create(input.rows, 3, CV_64F);
+//   // The homogeneous coordinates shape are (N, 3)
+//   output.col(2).setTo(1.0);
+//   // A last element in a homogeneous coordinate is 1
+//   input.copyTo(output.colRange(0, input.cols));
+// }
+
+cv::Mat to_homogeneous(const cv::Mat &input)
 {
-  output.create(input.rows, 3, CV_64F);
+  cv::Mat ret(input.rows, input.cols + 1, CV_64F);
+  // output.create(input.rows, 3, CV_64F);
   // The homogeneous coordinates shape are (N, 3)
-  output.col(2).setTo(1.0);
+  ret.col(input.cols).setTo(1.0);
   // A last element in a homogeneous coordinate is 1
-  input.copyTo(output.colRange(0, input.cols));
+  input.copyTo(ret.colRange(0, input.cols));
+  return ret;
 }
 
 cv::Mat slice_cvmat(const cv::Mat &input, const cv::Mat &indices)
 {
   cv::Mat ret = cv::Mat::zeros(indices.rows, input.cols, input.depth());
-  indices.forEach<uint16_t>([&ret, &input](const uint16_t &value, const int *position)
-                            { input.row(value).copyTo(ret.row(position[0])); });
+  indices.forEach<uint16_t>(
+      [&ret, &input](const uint16_t &value, const int *position)
+      {
+        const uchar *src = input.ptr(value);
+        uchar *dst = ret.ptr(position[0]);
+        memcpy(dst, src, input.cols * input.elemSize());
+        // input.row(value).copyTo(ret.row(position[0]));
+      });
   return ret;
 }
 }  // namespace Matrix

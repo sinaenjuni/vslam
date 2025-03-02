@@ -22,6 +22,7 @@ n_levels: 8
 n_points: 2000
 feature_size: 30
 scale_factor: 1.2
+max_tracking_size: 3
 
 
 # optimization

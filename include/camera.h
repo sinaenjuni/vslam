@@ -19,6 +19,8 @@ class Camera
   Camera(double fx, double fy, double cx, double cy, double bf, int width, int height);
   ~Camera();
 
+  inline cv::Mat get_K() { return this->K; };
+
   void unproject(const cv::Mat &kps, cv::Mat &kpsn) const;
-  void project(const cv::Mat &kpsn, cv::Mat &kps, cv::Mat &depth) const;
+  void project(const cv::Mat &kpsn, cv::Mat &kps) const;
 };

@@ -3,6 +3,8 @@
 
 #include <vector>
 
+class Map;
+
 class Viewer3D
 {
  private:
@@ -14,6 +16,7 @@ class Viewer3D
   float ViewpointZ;
   int ViewpointF;
 
+  Map *map;
   //   std::vector<Key_frame> key_frames;
   //   std::vector<Map_point> map_points;
   std::atomic<bool> is_running;
@@ -29,6 +32,7 @@ class Viewer3D
       int ViewpointY = -100,
       float ViewpointZ = -0.1,
       int ViewpointF = 2000);
+  inline void set_map(Map *map) { this->map = map; };
   void run();
   std::thread run_with_thread(Viewer3D &viewer3d);
   void stop_thread();

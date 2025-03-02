@@ -39,13 +39,11 @@ void draw_line(
     const cv::Mat kps_cur,
     const cv::Mat kps_ref,
     cv::Scalar color = cv::Scalar(0, 255, 0));
-
-cv::Mat slice_matrix(const cv::Mat &matrix, const cv::Mat &indices);
-
 }  // namespace Misc
 
 namespace Matrix
 {
-void to_homogeneous(const cv::Mat &input, cv::Mat &output);
+// void to_homogeneous(const cv::Mat &input, cv::Mat &output);
+cv::Mat to_homogeneous(const cv::Mat &input);
 cv::Mat slice_cvmat(const cv::Mat &input, const cv::Mat &indices);
 }  // namespace Matrix
