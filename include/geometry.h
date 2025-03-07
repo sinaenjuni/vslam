@@ -1,20 +1,25 @@
-#include <opencv2/opencv.hpp>
+#pragma once
 
-class Key_frame;
+#include <opencv2/core/mat.hpp>
+
+#include "key_frame.h"
+
+class Settings;
 
 namespace Geometry
 {
-void pose_estimation_with_essential_matrix(
-    const cv::Mat &kpsn1,
-    const cv::Mat &kpsn2,
+void estimatePoseWithEssentialMatrix(
+    KeyFramePtr keyFrame1,
+    KeyFramePtr keyFrame2,
     cv::Mat &idx_match1,
     cv::Mat &idx_match2,
     cv::Mat &R,
     cv::Mat &t);
 
-cv::Mat triangulate(
-    Key_frame const *const frame1,
-    Key_frame const *const frame2,
-    const cv::Mat idx_match1,
-    const cv::Mat idx_match2);
+std::vector<MapPointPtr> triangulate(
+    const KeyFramePtr frame1,
+    const KeyFramePtr frame2,
+    const cv::Mat &idx_match1,
+    const cv::Mat &idx_match2,
+    const Settings settings);
 }  // namespace Geometry

@@ -1,30 +1,36 @@
 #include "geometry.h"
 
+#include <opencv2/core.hpp>
+#include <opencv2/core/mat.hpp>
+
+#include "entities.h"
 #include "key_frame.h"
+#include "map_point.h"
 #include "misc.h"
+#include "settings.h"
 
 namespace Geometry
 {
 // Calculate T(transformation matrix) from a points2 to a points1
 // resultly, can get a T12 matrix
-void pose_estimation_with_essential_matrix(
-    const cv::Mat &kpsn1,
-    const cv::Mat &kpsn2,
+void estimatePoseWithEssentialMatrix(
+    KeyFramePtr keyFrame1,
+    KeyFramePtr keyFrame2,
     cv::Mat &idx_match1,
     cv::Mat &idx_match2,
     cv::Mat &R,
     cv::Mat &t)
 {
-  // cv::Mat points1(frame1->get_kpsn(idx_match1));
-  // cv::Mat points2(frame2->get_kpsn(idx_match2));
-  cv::Mat points1 = Matrix::slice_cvmat(kpsn1, idx_match1);
-  cv::Mat points2 = Matrix::slice_cvmat(kpsn2, idx_match2);
+  cv::Mat points1(keyFrame1->getKpsn(idx_match1));
+  cv::Mat points2(keyFrame2->getKpsn(idx_match2));
+  // cv::Mat points1 = Matrix::slice_cvmat(kpsn1, idx_match1);
+  // cv::Mat points2 = Matrix::slice_cvmat(kpsn2, idx_match2);
 
   cv::Mat E, inlier;
   // Calculate a transformation matrix from the points1 to the points`2.
   E = cv::findEssentialMat(
       points1, points2, 1.0, cv::Point2d(0, 0),
-      // cv::RANSAC, 0.999, 0.0004, inlier);
+      //  cv::RANSAC, 0.999, 0.0004, inlier);
       cv::RANSAC, 0.999, 0.004, inlier);
   // PRINT(E);
 
@@ -47,20 +53,118 @@ void pose_estimation_with_essential_matrix(
   inlier2.copyTo(idx_match2);
 }
 
-cv::Mat triangulate(
-    Key_frame const *const frame1,
-    Key_frame const *const frame2,
-    const cv::Mat idx_match1,
-    const cv::Mat idx_match2)
+std::vector<MapPointPtr> triangulate(
+    const KeyFramePtr keyFrame1,
+    const KeyFramePtr keyFrame2,
+    const cv::Mat &indMask1,
+    const cv::Mat &indMask2,
+    const Settings settings)
 {
   cv::Mat points4d;
   cv::triangulatePoints(
-      frame1->get_Twc().inverse()(4, 3).to_cvmat(), frame2->get_Twc().inverse()(4, 3).to_cvmat(),
-      frame1->get_kpsn(idx_match1).t(), frame2->get_kpsn(idx_match2).t(), points4d);
+      keyFrame1->getTwc().inverse()(4, 3).to_cvmat(),
+      keyFrame2->getTwc().inverse()(4, 3).to_cvmat(),
+      keyFrame1->getKpsn(indMask1).t(), keyFrame2->getKpsn(indMask2).t(),
+      points4d);
   points4d = points4d.t();
-  points4d = points4d / cv::repeat(points4d.col(3), 1, 4);
+  // points4d = points4d / cv::repeat(points4d.col(3), 1, 4);
+  cv::Mat w = points4d.col(3);
+  points4d.col(0) /= w;
+  points4d.col(1) /= w;
+  points4d.col(2) /= w;
+  points4d.col(3) = 1.0;
 
-  // return points4d.colRange(0, 3);
-  return points4d;
+  // calculate reprojection points
+  cv::Mat kpsReprojected1, depth1;
+  keyFrame1->projectWorld2Image(points4d, kpsReprojected1, depth1);
+  cv::Mat kpsReprojected2, depth2;
+  keyFrame2->projectWorld2Image(points4d, kpsReprojected2, depth2);
+
+  // check negative depth
+  cv::Mat bad_depth1 = depth1 < 0;
+  cv::Mat bad_depth2 = depth2 < 0;
+
+  cv::Mat kpsMatched1 = keyFrame1->getKps(indMask1);
+  cv::Mat kpsMatched2 = keyFrame2->getKps(indMask2);
+
+  // check reprojection errors
+  cv::Mat reprojectionError1 = kpsReprojected1 - kpsMatched1;
+  cv::reduce(reprojectionError1, reprojectionError1, 1, cv::REDUCE_SUM2);
+  reprojectionError1 =
+      reprojectionError1.mul(keyFrame1->getSigma2inv(indMask1));
+
+  cv::Mat reprojectionError2 = kpsReprojected2 - kpsMatched2;
+  cv::reduce(reprojectionError2, reprojectionError2, 1, cv::REDUCE_SUM2);
+  reprojectionError2 =
+      reprojectionError2.mul(keyFrame2->getSigma2inv(indMask2));
+
+  cv::Mat bad_reprojection_cur = reprojectionError1 > settings.kChi2Mono;
+  cv::Mat bad_reprojection_ref = reprojectionError2 > settings.kChi2Mono;
+
+  // check cos parallex
+  cv::Mat ray1, normRayPerRow1, normRay1;
+  keyFrame1->projectFrame2World(keyFrame1->getKpsn(indMask1), ray1);
+  // cv::reduce(ray1, normRayPerRow1, 1, cv::REDUCE_SUM2);
+  // cv::sqrt(normRayPerRow1, normRayPerRow1);
+  // cv::repeat(normRayPerRow1, 1, 3, normRay1);
+  // cv::divide(ray1, normRay1, ray1);
+  cv::normalize(ray1, ray1, 1.0, 0.0, cv::NORM_L2, -1, cv::noArray());
+
+  cv::Mat ray2, normRayPerRow2, normRay2;
+  keyFrame2->projectFrame2World(keyFrame2->getKpsn(indMask2), ray2);
+  // cv::reduce(ray2, normRayPerRow2, 1, cv::REDUCE_SUM2);
+  // cv::sqrt(normRayPerRow2, normRayPerRow2);
+  // cv::repeat(normRayPerRow2, 1, 3, normRay2);
+  // cv::divide(ray2, normRay2, ray2);
+  cv::normalize(ray2, ray2, 1.0, 0.0, cv::NORM_L2, -1, cv::noArray());
+
+  cv::Mat cosParallax;
+  cv::reduce(ray1.mul(ray2), cosParallax, 1, cv::REDUCE_SUM);
+  cv::Mat bad_cos_parallax =
+      (cosParallax < 0) | (cosParallax > settings.cos_max_parallax);
+
+  // check scale consistency
+  double scale_consistency_ratio =
+      settings.scale_consistency_factor * settings.scale_factor;
+  cv::Mat scaled_depth_cur = keyFrame1->getSigma2(indMask1).mul(depth1);
+  cv::Mat consistency_scaled_depth_cur =
+      scaled_depth_cur * scale_consistency_ratio;
+
+  cv::Mat scaled_depth_ref = keyFrame2->getSigma2(indMask2).mul(depth2);
+  cv::Mat consistency_scaled_depth_ref =
+      scaled_depth_ref * scale_consistency_ratio;
+
+  cv::Mat bad_scale_consistency =
+      (scaled_depth_cur > consistency_scaled_depth_ref) |
+      (scaled_depth_ref > consistency_scaled_depth_cur);
+
+  cv::Mat bad_points = bad_depth1 | bad_depth2 | bad_reprojection_cur |
+                       bad_reprojection_ref | bad_cos_parallax |
+                       bad_scale_consistency;
+
+  std::vector<MapPointPtr> ret;
+  for (size_t i = 0; i < points4d.rows; ++i)
+  {
+    if (bad_points.at<bool>(i))
+    {
+      continue;
+    }
+
+    cv::Vec4d point4d = points4d.row(i);
+
+    cv::Vec<uint8_t, 32> descriptor = keyFrame1->getDescriptor().row(i);
+    MapPointPtr mapPoint = std::make_shared<MapPoint>(
+        PosD{point4d.val[0], point4d.val[1], point4d.val[2]}, descriptor);
+
+    mapPoint->addObservation(keyFrame1->getID());
+    mapPoint->addObservation(keyFrame2->getID());
+
+    keyFrame1->addObservation(mapPoint->getID(), indMask1.at<int>(i));
+    keyFrame2->addObservation(mapPoint->getID(), indMask2.at<int>(i));
+
+    ret.push_back(mapPoint);
+  }
+
+  return ret;
 }
 }  // namespace Geometry

@@ -2,8 +2,19 @@
 
 #include <Eigen/Dense>
 #include <iostream>
+#include <memory>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
+
+class KeyFrame;
+class MapPoint;
+
+using MapPointID = int;
+using KeyFrameID = int;
+using ImgPointIdx = int;
+
+using KeyFramePtr = std::shared_ptr<KeyFrame>;
+using MapPointPtr = std::shared_ptr<MapPoint>;
 
 class Rt
 {
@@ -57,13 +68,13 @@ class Rt
   }
 };
 
-struct PosF
+struct PosD
 {
   double x, y, z;
 
-  friend std::ostream &operator<<(std::ostream &os, const PosF &PosF)
+  friend std::ostream &operator<<(std::ostream &os, const PosD &PosD)
   {
-    os << "PosF\n" << PosF.x << ", " << PosF.y << ", " << PosF.z << "\n";
+    os << "PosD\n" << PosD.x << ", " << PosD.y << ", " << PosD.z << "\n";
     return os;
   }
 };
@@ -77,7 +88,8 @@ struct Color
   friend std::ostream &operator<<(std::ostream &os, const Color &color_dao)
   {
     os << "color_dao\n"
-       << color_dao.red << ", " << color_dao.green << ", " << color_dao.blue << "\n";
+       << color_dao.red << ", " << color_dao.green << ", " << color_dao.blue
+       << "\n";
     return os;
   }
 };
@@ -87,9 +99,12 @@ struct Key_frame_DO
   Eigen::Matrix4d Twc;
   Color color;
 
-  friend std::ostream &operator<<(std::ostream &os, const Key_frame_DO &key_frame_DO)
+  friend std::ostream &operator<<(
+      std::ostream &os, const Key_frame_DO &key_frame_DO)
   {
-    os << "key_frame_DO\n" << key_frame_DO.Twc << "\n" << key_frame_DO.color << "\n";
+    os << "key_frame_DO\n"
+       << key_frame_DO.Twc << "\n"
+       << key_frame_DO.color << "\n";
     return os;
   }
 };
@@ -101,11 +116,12 @@ struct Map_point_DO
   float z = 0.0;
   Color color;
 
-  friend std::ostream &operator<<(std::ostream &os, const Map_point_DO &Map_point_DO)
+  friend std::ostream &operator<<(
+      std::ostream &os, const Map_point_DO &Map_point_DO)
   {
     os << "Map_point_DO\n"
-       << Map_point_DO.x << ", " << Map_point_DO.y << ", " << Map_point_DO.z << ", "
-       << Map_point_DO.color << "\n";
+       << Map_point_DO.x << ", " << Map_point_DO.y << ", " << Map_point_DO.z
+       << ", " << Map_point_DO.color << "\n";
     return os;
   }
 };

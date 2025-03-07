@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     # GTK dependencies
     libgtk2.0-dev libgtk-3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+    # apt install libboost-all-dev git (DBoW2)
     
 WORKDIR /thirdparty
 RUN mkdir yaml-cpp eigen opencv g2o pangolin
@@ -81,6 +83,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /thirdparty /vslam/thirdparty
 # echo 'export LD_LIBRARY_PATH=/vslam/thirdparty/pangolin/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
 # echo 'export LD_LIBRARY_PATH=/vslam/thirdparty/opencv/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+# echo 'export CMAKE_PREFIX_PATH=/vslam/thirdparty/opencv:$CMAKE_PREFIX_PATH' >> ~/.bashrc
 
 VOLUME /vslam/thirdparty
 WORKDIR /vslam
@@ -88,6 +91,8 @@ WORKDIR /vslam
 # CMD ["/bin/bash"]
 ENV LD_LIBRARY_PATH="/vslam/thirdparty/pangolin/lib:$LD_LIBRARY_PATH"
 ENV LD_LIBRARY_PATH="/vslam/thirdparty/opnecv/lib:$LD_LIBRARY_PATH"
+ENV CMAKE_PREFIX_PATH="/vslam/thirdparty/opencv::$CMAKE_PREFIX_PATH"
+
 # for a pangolin GUI error 
 ENV XDG_RUNTIME_DIR="/tmp"
 

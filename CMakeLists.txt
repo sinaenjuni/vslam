@@ -33,6 +33,7 @@ add_library(slam STATIC
     src/octree.cpp
     src/feature.cpp
     src/tracker.cpp    
+    src/bow.cpp
     src/vslam.cpp
 
 
@@ -72,7 +73,20 @@ find_package(Pangolin 0.9.2 EXACT REQUIRED PATHS "thirdparty/pangolin")
 if(Pangolin_FOUND)
     message("Pangolin ${Pangolin_VERSION} found")
     target_link_libraries(slam PUBLIC ${Pangolin_LIBRARY})
-    
+endif()
+
+find_package(DLib REQUIRED PATHS "thirdparty/DBoW2")
+if(DLib_FOUND)
+    message("DLib ${DLib_VERSION} found")
+    target_link_libraries(slam PUBLIC ${DLib_LIBRARIES})
+    target_include_directories(slam PUBLIC ${DLib_INCLUDE_DIRS})
+endif()
+
+find_package(DBoW2 REQUIRED PATHS "thirdparty/DBoW2")
+if(DBoW2_FOUND)
+    message("DBoW2 ${DBoW2_VERSION} found")
+    target_link_libraries(slam PUBLIC ${DBoW2_LIBRARIES})
+    target_include_directories(slam PUBLIC ${DBoW2_INCLUDE_DIRS})
 endif()
 
 

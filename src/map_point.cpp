@@ -1,8 +1,19 @@
 #include "map_point.h"
 
-Map_point::Map_point() {}
-Map_point::Map_point(PosF position, cv::Vec<uint8_t, 32> descripor)
-    : position(position), descripor(descripor)
+int getMapPointID()
 {
+  static int _MAP_POINT_ID = -1;
+  return ++_MAP_POINT_ID;
 }
-Map_point::~Map_point() {}
+
+MapPoint::MapPoint() : id(getMapPointID()) {}
+// MapPoint::MapPoint(PosD position, cv::Vec<uint8_t, 32> descriptor)
+//     : id(getMapPointID()), position(position), descriptor(descriptor)
+// {
+// }
+MapPoint::MapPoint(PosD position, cv::Vec<uint8_t, 32> descriptor) : MapPoint()
+{
+  this->position = position;
+  this->descriptor = descriptor;
+}
+MapPoint::~MapPoint() {}

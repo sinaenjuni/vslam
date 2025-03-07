@@ -5,7 +5,7 @@
 
 #include "settings.h"
 
-class Key_frame;
+class KeyFrame;
 
 // class IFeature_extractor
 // {
@@ -43,9 +43,18 @@ class FAST_ORB_extractor
   ~FAST_ORB_extractor();
 
   void detect(const cv::Mat &img, std::vector<cv::KeyPoint> &kps);
-  void detect_with_octave(const cv::Mat &img, std::vector<cv::KeyPoint> &kps, int octave);
-  void detect_and_compute(const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc);
-  Key_frame *extract(const cv::Mat &img);
+  void detect_with_octave(
+      const cv::Mat &img, std::vector<cv::KeyPoint> &kps, int octave);
+  void detect_and_compute(
+      const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc);
+  bool extract(
+      const cv::Mat &img,
+      cv::Mat &kps,
+      cv::Mat &kpsn,
+      cv::Mat &descriptor,
+      cv::Mat &octave,
+      cv::Mat &sigma2,
+      cv::Mat &sigma2inv);
   double_t get_scale2inv(const int octave) const;
   double_t get_scale2(const int octave) const;
 };
@@ -55,7 +64,7 @@ class IFeature_matcher
  public:
   virtual ~IFeature_matcher() = default;
 
-  virtual void compute_match(
+  virtual void matching(
       const cv::Mat &query,
       const cv::Mat &train,
       cv::Mat &idx_match_query,
@@ -71,7 +80,7 @@ class BFMatcher : public IFeature_matcher
   BFMatcher(cv::Ptr<cv::BFMatcher> matcher);
   ~BFMatcher();
 
-  void compute_match(
+  void matching(
       const cv::Mat &query,
       const cv::Mat &train,
       cv::Mat &idx_match_query,

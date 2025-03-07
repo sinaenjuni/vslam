@@ -90,20 +90,32 @@ void FAST_ORB_extractor::detect_and_compute(
   descriptor->compute(img, kps, desc);
 }
 
-Key_frame *FAST_ORB_extractor::extract(const cv::Mat &img)
+bool FAST_ORB_extractor::extract(
+    const cv::Mat &img,
+    cv::Mat &kps,
+    cv::Mat &kpsn,
+    cv::Mat &descriptor,
+    cv::Mat &octave,
+    cv::Mat &sigma2,
+    cv::Mat &sigma2inv)
 {
-  Key_frame *key_frame = new Key_frame();
+  // Key_frame *key_frame = new Key_frame();
   std::vector<cv::KeyPoint> pts;
-  cv::Mat descriptor;
+  // cv::Mat descriptor;
   this->detect_and_compute(img, pts, descriptor);
-  key_frame->set_descriptor(descriptor);
+  // key_frame->set_descriptor(descriptor);
+
+  if (pts.size() < 1000)
+  {
+    return false;
+  }
 
   int nkps = pts.size();
-  cv::Mat kps(nkps, 2, CV_64F);
-  cv::Mat kpsn(nkps, 2, CV_64F);
-  cv::Mat octave(nkps, 1, CV_16F);
-  cv::Mat sigma2(nkps, 1, CV_64F);
-  cv::Mat sigma2inv(nkps, 1, CV_64F);
+  kps = cv::Mat(nkps, 2, CV_64F);
+  kpsn = cv::Mat(nkps, 2, CV_64F);
+  octave = cv::Mat(nkps, 1, CV_16F);
+  sigma2 = cv::Mat(nkps, 1, CV_64F);
+  sigma2inv = cv::Mat(nkps, 1, CV_64F);
 
   for (size_t i = 0; i < nkps; i++)
   {
@@ -115,12 +127,13 @@ Key_frame *FAST_ORB_extractor::extract(const cv::Mat &img)
     sigma2.at<double_t>(i) = this->get_scale2(pts[i].octave);
     sigma2inv.at<double_t>(i) = this->get_scale2inv(pts[i].octave);
   }
+  this->camera->unproject(kps, kpsn);
+  return true;
 
   // key_frame->get_kps().create(nkps, 2, CV_64F);
-  this->camera->unproject(kps, kpsn);
-  key_frame->set_kps(kps, kpsn, octave, sigma2, sigma2inv);
+  // key_frame->set_kps(kps, kpsn, octave, sigma2, sigma2inv);
 
-  return key_frame;
+  // return key_frame;
 }
 
 double_t FAST_ORB_extractor::get_scale2inv(const int octave) const
@@ -135,7 +148,7 @@ double_t FAST_ORB_extractor::get_scale2(const int octave) const
 
 BFMatcher::BFMatcher(cv::Ptr<cv::BFMatcher> matcher) : matcher(matcher) {}
 BFMatcher::~BFMatcher() {}
-void BFMatcher::compute_match(
+void BFMatcher::matching(
     const cv::Mat &query, const cv::Mat &train, cv::Mat &idx_match_query, cv::Mat &idx_match_train)
 {
   std::vector<std::vector<cv::DMatch>> matches;

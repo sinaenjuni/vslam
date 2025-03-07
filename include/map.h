@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <opencv2/core/types.hpp>
+#include <unordered_map>
+
 #include "key_frame.h"
 #include "map_point.h"
 #include "settings.h"
@@ -12,8 +16,8 @@ class Map
   int scale_consistency_factor;
   int cos_max_parallax;
 
-  std::vector<Key_frame *> key_frames;
-  std::vector<Map_point *> map_points;
+  std::unordered_map<KeyFrameID, KeyFramePtr> keyFrames;
+  std::unordered_map<MapPointID, MapPointPtr> mapPoints;
 
  public:
   Map() {}
@@ -25,14 +29,28 @@ class Map
   {
   }
 
-  inline void add_key_frame(Key_frame *key_frame) { this->key_frames.push_back(key_frame); }
-  inline void add_map_point(Map_point *map_point) { this->map_points.push_back(map_point); };
-  inline std::vector<Key_frame *> get_key_frames() const { return this->key_frames; };
-  inline std::vector<Map_point *> get_map_points() const { return this->map_points; };
+  inline void addkeyFrame(KeyFramePtr keyFrame)
+  {
+    // this->keyFrames.push_back(keyFrame);
+    this->keyFrames[keyFrame->getID()] = keyFrame;
+  }
+  inline void addMapPoint(MapPointPtr mapPoint)
+  {
+    // this->mapPoints.push_back(map_point);
+    this->mapPoints[mapPoint->getID()] = mapPoint;
+  };
+  inline std::unordered_map<KeyFrameID, KeyFramePtr> getKeyFrames() const
+  {
+    return this->keyFrames;
+  };
+  inline std::unordered_map<MapPointID, MapPointPtr> getMapPoints() const
+  {
+    return this->mapPoints;
+  };
 
   void add_map_points(
-      const Key_frame *const frame1,
-      const Key_frame *const frame2,
+      const KeyFrame *const frame1,
+      const KeyFrame *const frame2,
       const Camera &camera,
       const cv::Mat &idx_frame1,
       const cv::Mat &idx_frame2,
