@@ -4,14 +4,16 @@
 #include <opencv2/core/types.hpp>
 #include <unordered_map>
 
-#include "key_frame.h"
+#include "frame.h"
 #include "map_point.h"
 #include "settings.h"
+
+class Camera;
 
 class Map
 {
  private:
-  int kChi;
+  int chiThreshold;
   int scale_factor;
   int scale_consistency_factor;
   int cos_max_parallax;
@@ -22,8 +24,8 @@ class Map
  public:
   Map() {}
   Map(Settings settings)
-      : kChi(settings.kChi2Mono),
-        scale_factor(settings.scale_factor),
+      : chiThreshold(settings.chi_square_threshold),
+        scale_factor(settings.scaleFactor),
         scale_consistency_factor(settings.scale_consistency_factor),
         cos_max_parallax(settings.cos_max_parallax)
   {

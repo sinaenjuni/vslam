@@ -15,7 +15,7 @@ class Camera
 
  public:
   Camera();
-  Camera(Settings settings);
+  Camera(Settings &settings);
   Camera(double fx, double fy, double cx, double cy, double bf, int width, int height);
   ~Camera();
 

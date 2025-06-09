@@ -1,24 +1,39 @@
 #pragma once
 
-#include <opencv2/core/mat.hpp>
-#include <queue>
+#include <cstddef>
+#include <memory>
 
-#include "key_frame.h"
+#include "frame.h"
 
-class Settings;
-class IFeature_matcher;
+class Tracker;
+class TrackerState
+{
+ public:
+  virtual void processFrame(Tracker& tracker, const KeyFrame* frame) = 0;
+  // pure vitual function.
+  virtual ~TrackerState() = default;
+  // delegate to compiler to make a destructor.
+};
 
 class Tracker
 {
  private:
-  IFeature_matcher *matcher;
-
-  // uint max_size;
-  // std::queue<Key_frame *> tracked_frames;
-  KeyFramePtr lastKeyFrame;
+  std::unique_ptr<TrackerState> state;
+  KeyFrame* lastFrame = nullptr;
 
  public:
-  Tracker();
-  Tracker(Settings settings, IFeature_matcher *matcher);
-  Rt track(KeyFramePtr keyFrame, const cv::Mat &view_img);
+  Tracker(TrackerState* initState) : state(initState) {}
+  KeyFrame* getLastFrame() { return lastFrame; }
+  void setLastFrame(KeyFrame* lastFrame) { lastFrame = lastFrame; }
+  void setState(TrackerState* trackerState) { state.reset(trackerState); }
+  void processFrame(KeyFrame* frame) { state->processFrame(*this, frame); }
+};
+
+class InitTrackingState : public TrackerState
+{
+ public:
+  void processFrame(Tracker& tracker, const KeyFrame* frame) override
+  {
+    tracker.getLastFrame();
+  }
 };

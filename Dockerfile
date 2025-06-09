@@ -15,11 +15,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
     # apt install libboost-all-dev git (DBoW2)
-    
+
 WORKDIR /thirdparty
-RUN mkdir yaml-cpp eigen opencv g2o pangolin
+RUN mkdir yaml-cpp eigen opencv g2o pangolin dbow2
 WORKDIR /temp
-RUN mkdir yaml-cpp_temp eigen_temp opencv_temp g2o_temp pangolin_temp
+RUN mkdir yaml-cpp_temp eigen_temp opencv_temp g2o_temp pangolin_temp dbow2_temp
 
 RUN wget -O /temp/yaml-cpp_temp.tar.gz \
         https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz \
@@ -63,11 +63,20 @@ RUN wget -O /temp/pangolin_temp.tar.gz \
         -DEigen3_DIR="/thirdparty/eigen/share/eigen3/cmake" \
     && make install -j4 
 
+RUN wget -O /temp/dbow2_temp.tar.gz \
+    https://github.com/dorian3d/DBoW2/archive/refs/heads/master.tar.gz \
+    && tar -xzf /temp/dbow2_temp.tar.gz -C /temp/dbow2_temp --strip-components=1 \
+    && mkdir /temp/dbow2_temp/build \
+    && cd /temp/dbow2_temp/build \
+    && cmake .. -DCMAE_PREFIX_INSTALL="/thirdparty/dbow2" \
+        -DOpenCV_DIR="/thirdparty/opencv/lib/cmake/opencv4" \
+    && make install -j4 
+    
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y \
     # Build tools
     g++ cmake \
-    # OpenGL & graphics dependencies
+    # OpenGL & graphics depenencies
     libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev \
     # Logging & utility libraries
     libspdlog-dev libepoxy-dev \
@@ -89,12 +98,18 @@ VOLUME /vslam/thirdparty
 WORKDIR /vslam
 # COPY . /vslam
 # CMD ["/bin/bash"]
-ENV LD_LIBRARY_PATH="/vslam/thirdparty/pangolin/lib:$LD_LIBRARY_PATH"
-ENV LD_LIBRARY_PATH="/vslam/thirdparty/opnecv/lib:$LD_LIBRARY_PATH"
-ENV CMAKE_PREFIX_PATH="/vslam/thirdparty/opencv::$CMAKE_PREFIX_PATH"
+ENV LD_LIBRARY_PATH="/vslam/thirdparty/pangolin/lib:/vslam/thirdparty/opencv/lib:$LD_LIBRARY_PATH"
+ENV CMAKE_PREFIX_PATH="/vslam/thirdparty/pangolin:/vslam/thirdparty/opencv:$CMAKE_PREFIX_PATH"
 
 # for a pangolin GUI error 
 ENV XDG_RUNTIME_DIR="/tmp"
+
+# setting clangd 19 version(https://apt.llvm.org/)
+RUN apt update && apt install -y wget lsb-release wget software-properties-common gnupg curl \
+    wget https://apt.llvm.org/llvm.sh \
+    chmod +x llvm.sh \ 
+    ./llvm.sh 19 \
+    ln -s /usr/bin/clangd-19 /usr/bin/clangd
 
 CMD ["/bin/bash", "-c", "tail -f /dev/null"]
 

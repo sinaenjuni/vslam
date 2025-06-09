@@ -4,6 +4,7 @@
 #include <vector>
 
 class Map;
+class Settings;
 
 class Viewer3D
 {
@@ -16,25 +17,26 @@ class Viewer3D
   float ViewpointZ;
   int ViewpointF;
 
-  Map *map;
+  Map &map;
   //   std::vector<Key_frame> key_frames;
   //   std::vector<Map_point> map_points;
   std::atomic<bool> is_running;
 
  public:
-  Viewer3D();
+  // Viewer3D();
+  Viewer3D(Settings settings, Map &map);
   ~Viewer3D();
-  void setup(
-      std::string window_name = "Visual slam",
-      int win_width = 1024,
-      int win_height = 768,
-      int ViewpointX = 0,
-      int ViewpointY = -100,
-      float ViewpointZ = -0.1,
-      int ViewpointF = 2000);
-  inline void set_map(Map *map) { this->map = map; };
+  // void setup(
+  //     std::string window_name = "Visual slam",
+  //     int win_width = 1024,
+  //     int win_height = 768,
+  //     int ViewpointX = 0,
+  //     int ViewpointY = -100,
+  //     float ViewpointZ = -0.1,
+  //     int ViewpointF = 2000);
+  // inline void set_map(Map *map) { this->map = map; };
   void run();
-  std::thread run_with_thread(Viewer3D &viewer3d);
+  std::thread runWithThread(Viewer3D &viewer3d);
   void stop_thread();
   inline bool get_is_running() { return this->is_running; }
   //   inline void set_key_frames()

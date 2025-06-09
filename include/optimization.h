@@ -1,21 +1,21 @@
-#include <opencv2/opencv.hpp>
+#include <g2o/types/slam3d/se3quat.h>
 
-class Key_frame;
-class Camera;
-class Settings;
+#include <Eigen/Dense>
 
-namespace Optimization
+#include "entities.h"
+
+class Converter
 {
-namespace Filter
-{
-cv::Mat filtering_points4d(
-    const Key_frame *const frame1,
-    const Key_frame *const frame2,
-    const Camera &camera,
-    const Settings &settings,
-    const cv::Mat &idx_frame1,
-    const cv::Mat &idx_frame2,
-    const cv::Mat &points4d);
+ public:
+  static g2o::SE3Quat toSE3Quat(const cv::Mat &cvMat);
+  static Eigen::Matrix<double, 3, 1> toVector3d(const PosD &pos);
+};
 
-}
-};  // namespace Optimization
+class Optimizer
+{
+ public:
+  static void bundleAdjustment(
+      const std::vector<KeyFramePtr> &keyFrames,
+      const std::vector<MapPointPtr> &mapPoints,
+      int nIterations);
+};

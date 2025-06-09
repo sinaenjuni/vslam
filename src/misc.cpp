@@ -46,7 +46,7 @@ void draw_kps(
 {
   for (auto &kp : kps)
   {
-    cv::circle(img, kp.pt, 2, color, -1, cv::LINE_AA);
+    cv::circle(img, kp.pt, 2, color, 1, cv::LINE_AA);
   }
 }
 
@@ -55,7 +55,11 @@ void draw_kps(const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
   for (size_t i = 0; i < kps.rows; i++)
   {
     cv::circle(
-        img, static_cast<cv::Point2f>(kps.row(i).colRange(0, 2)), 2, color, -1,
+        img,
+        static_cast<cv::Point2f>(kps.row(i).colRange(0, 2)),
+        2,
+        color,
+        -1,
         cv::LINE_AA);
   }
 }
@@ -69,9 +73,12 @@ void draw_line(
   for (size_t i = 0; i < kps_cur.rows; i++)
   {
     cv::line(
-        img, cv::Point2d(kps_cur.at<double>(i, 0), kps_cur.at<double>(i, 1)),
-        cv::Point2d(kps_ref.at<double>(i, 0), kps_ref.at<double>(i, 1)), color,
-        1, cv::LINE_AA);
+        img,
+        cv::Point2d(kps_cur.at<double>(i, 0), kps_cur.at<double>(i, 1)),
+        cv::Point2d(kps_ref.at<double>(i, 0), kps_ref.at<double>(i, 1)),
+        color,
+        1,
+        cv::LINE_AA);
   }
 }
 

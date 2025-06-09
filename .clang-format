@@ -1,8 +1,13 @@
 BasedOnStyle: Google
 IndentWidth: 2
 ColumnLimit: 80
+UseTab: Never
 BreakBeforeBraces: Allman
-# PointerAlignment: Left
-# ReferenceAlignment: Left
-BinPackParameters: false
 AlignAfterOpenBracket: AlwaysBreak
+
+BinPackArguments: false
+BinPackParameters: false
+# ReferenceAlignmentStyle: RAS_Right
+
+# AllowAllArgumentsOnNextLine: false
+# AllowAllParametersOfDeclarationOnNextLine: false

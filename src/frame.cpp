@@ -2,10 +2,15 @@
 
 #include <opencv2/core/hal/interface.h>
 
+#include <cmath>
+#include <cstddef>
+#include <opencv2/core/cvstd_wrapper.hpp>
+#include <opencv2/core/fast_math.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
+#include <opencv2/features2d.hpp>
 
-#include "feature.h"
+#include "extractor.h"
 #include "misc.h"
 
 int getKeyFrameID()
@@ -92,11 +97,33 @@ float KeyFrame::gridRowsInv = 0.0;
 KeyFrame::KeyFrame() : id(getKeyFrameID()), Twc(cv::Mat::eye(4, 4, CV_64F)) {}
 KeyFrame::KeyFrame(const cv::Mat &img, FastOrbExtractor *featureExtractor)
 {
-  featureExtractor->detect_and_compute(img, mvKps, mDescriptors);
+  featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
   N = mvKps.size();
-  mvMapPoints = std::vector<MapPoint *>(N, nullptr);
-  assignFeaturesToGrid();
+  PRINT("KeyFrame::KeyFrame", N);
+  // featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+
+  // featureExtractor->detectAndCompute(img, mvKps);
+  // N = mvKps.size();
+  // mvMapPoints = std::vector<MapPoint *>(N, nullptr);
+  // assignFeaturesToGrid();
 }
+
+KeyFrame::KeyFrame(const cv::Mat &img, cv::Ptr<cv::ORB> featureExtractor)
+{
+  featureExtractor->detectAndCompute(img, cv::noArray(), mvKps, mDescriptors);
+  N = mvKps.size();
+  PRINT("KeyFrame::KeyFrame", N);
+  setKpsToGrid();
+
+  // PRINT("KeyFrame::KeyFrame", mvKps.size());
+  // featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+
+  // featureExtractor->detectAndCompute(img, mvKps);
+  // N = mvKps.size();
+  // mvMapPoints = std::vector<MapPoint *>(N, nullptr);
+  // assignFeaturesToGrid();
+}
+
 KeyFrame::KeyFrame(
     cv::Mat &kps,
     cv::Mat &kpsn,
@@ -196,10 +223,10 @@ void KeyFrame::initStaticVariables(
     KeyFrame::maxY = imgHeight;
   }
 
-  KeyFrame::gridColsInv =
-      KeyFrame::GRID_COLS / (KeyFrame::maxX - KeyFrame::minX);
-  KeyFrame::gridRowsInv =
-      KeyFrame::GRID_ROWS / (KeyFrame::maxY - KeyFrame::minY);
+  KeyFrame::gridColsInv = static_cast<float>(KeyFrame::GRID_COLS) /
+                          (KeyFrame::maxX - KeyFrame::minX);
+  KeyFrame::gridRowsInv = static_cast<float>(KeyFrame::GRID_ROWS) /
+                          (KeyFrame::maxY - KeyFrame::minY);
 }
 
 // KeyFrame::KeyFrame(const cv::Mat &img, Camera &camera, FAST_ORB_extractor
@@ -381,39 +408,106 @@ const cv::Mat KeyFrame::get_descriptor(const cv::Mat &indices) const
   return ret;
 }
 
-void KeyFrame::assignFeaturesToGrid()
+void KeyFrame::setKpsToGrid()
 {
   int nReserve = 0.5f * N / (GRID_COLS * GRID_ROWS);
-  for (unsigned int i = 0; i < GRID_COLS; i++)
+  for (size_t row = 0; row < GRID_ROWS; row++)
   {
-    for (unsigned int j = 0; j < GRID_ROWS; j++)
+    for (size_t col = 0; col < GRID_COLS; col++)
     {
-      mvGrid[i][j].reserve(nReserve);
+      mvGrid[row][col].reserve(nReserve);
     }
   }
 
   for (int i = 0; i < N; i++)
   {
     const cv::KeyPoint &kp = mvKps[i];
-
     int posX, posY;
-    if (calcPosInGrid(kp, posX, posY))
+    if (getPosInGrid(kp, posX, posY))
     {
-      mvGrid[posX][posY].push_back(i);
+      mvGrid[posY][posX].push_back(i);
     }
   }
 }
 
-bool KeyFrame::calcPosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
+bool KeyFrame::getPosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
 {
-  posX = round((kp.pt.x - KeyFrame::minX) * KeyFrame::gridColsInv);
-  posY = round((kp.pt.y - KeyFrame::minY) * KeyFrame::gridRowsInv);
+  posX = cvRound((kp.pt.x - KeyFrame::minX) * KeyFrame::gridColsInv);
+  posY = cvRound((kp.pt.y - KeyFrame::minY) * KeyFrame::gridRowsInv);
 
   // Keypoint's coordinates are undistorted, which could cause to go out of the
   // image
-  if (posX < 0 || posX >= KeyFrame::GRID_COLS || posY < 0 ||
-      posY >= KeyFrame::GRID_ROWS)
+  if (posX < 0 || posX >= KeyFrame::GRID_COLS ||  //
+      posY < 0 || posY >= KeyFrame::GRID_ROWS)
     return false;
-
   return true;
+}
+
+std::vector<size_t> KeyFrame::getKpsInGrid(
+    const float &x,
+    const float &y,
+    const float &r,
+    const int minLevel,
+    const int maxLevel) const
+{
+  std::vector<size_t> vIndices;
+  vIndices.reserve(N);
+
+  const float gridWidthInv = KeyFrame::gridColsInv;
+  const float gridHeightInv = KeyFrame::gridRowsInv;
+  const int nMinCellX =
+      std::max(0, cvRound((x - KeyFrame::minX - r) * gridWidthInv));
+  const int nMaxCellX = std::min(
+      static_cast<int>(GRID_COLS) - 1,
+      cvRound((x - KeyFrame::minX + r) * gridWidthInv));
+  const int nMinCellY =
+      std::max(0, cvRound((y - KeyFrame::minY - r) * gridHeightInv));
+  const int nMaxCellY = std::min(
+      static_cast<int>(GRID_ROWS) - 1,
+      cvRound((y - KeyFrame::minY + r) * gridHeightInv));
+
+  if (nMaxCellX < 0 || nMinCellX >= GRID_COLS ||  //
+      nMaxCellY < 0 || nMinCellY >= GRID_ROWS)
+  {
+    std::cerr << "Warning: Search area out of grid bounds (x=" << x
+              << ", y=" << y << ", r=" << r << ")" << std::endl;
+    return vIndices;
+  }
+  const bool bCheckLevels = (minLevel > 0) || (maxLevel >= 0);
+
+  for (int iy = nMinCellY; iy <= nMaxCellY; ++iy)  // row frist iteration
+  {
+    for (int ix = nMinCellX; ix <= nMaxCellX; ++ix)  // column iteration
+    {
+      const std::vector<size_t> &vKpsInCell = mvGrid[iy][ix];
+      // mGrid[posY][posX]
+      if (vKpsInCell.empty()) continue;
+
+      for (const int &kpsInCell : vKpsInCell)
+      {
+        const cv::KeyPoint &kp = mvKps[kpsInCell];
+        if (bCheckLevels)
+        {
+          if (kp.octave < minLevel || (maxLevel >= 0 && kp.octave > maxLevel))
+          {
+            continue;
+          }
+        }
+
+        const float distx = kp.pt.x - x;
+        const float disty = kp.pt.y - y;
+        // const float scale = 1.0f / (1 << kpUn.octave);
+        // if (distx * distx + disty * disty < r * r * scale * scale)
+        // {
+        //   vIndices.push_back(kpsInCell);
+        // }
+        if (fabs(distx) < r && fabs(disty) < r)
+        {
+          vIndices.push_back(kpsInCell);
+        }
+      }
+    }
+  }
+
+  return vIndices;
 }

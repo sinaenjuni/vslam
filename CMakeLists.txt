@@ -5,9 +5,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g -O1")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG_MODE)
@@ -26,12 +29,13 @@ add_library(slam STATIC
     src/optimization.cpp
     
     src/map_point.cpp
-    src/key_frame.cpp
+    src/frame.cpp
     src/map.cpp
     src/viewer3d.cpp
    
-    src/octree.cpp
-    src/feature.cpp
+    src/quadtree.cpp
+    src/matcher.cpp
+    src/extractor.cpp
     src/tracker.cpp    
     src/bow.cpp
     src/vslam.cpp
@@ -75,14 +79,14 @@ if(Pangolin_FOUND)
     target_link_libraries(slam PUBLIC ${Pangolin_LIBRARY})
 endif()
 
-find_package(DLib REQUIRED PATHS "thirdparty/DBoW2")
-if(DLib_FOUND)
-    message("DLib ${DLib_VERSION} found")
-    target_link_libraries(slam PUBLIC ${DLib_LIBRARIES})
-    target_include_directories(slam PUBLIC ${DLib_INCLUDE_DIRS})
-endif()
+# find_package(DLib REQUIRED PATHS "thirdparty/DBoW2")
+# if(DLib_FOUND)
+#     message("DLib ${DLib_VERSION} found")
+#     target_link_libraries(slam PUBLIC ${DLib_LIBRARIES})
+#     target_include_directories(slam PUBLIC ${DLib_INCLUDE_DIRS})
+# endif()
 
-find_package(DBoW2 REQUIRED PATHS "thirdparty/DBoW2")
+find_package(DBoW2 REQUIRED PATHS "thirdparty/dbow2")
 if(DBoW2_FOUND)
     message("DBoW2 ${DBoW2_VERSION} found")
     target_link_libraries(slam PUBLIC ${DBoW2_LIBRARIES})
@@ -92,3 +96,7 @@ endif()
 
 add_executable(main examples/main.cpp)
 target_link_libraries(main slam)
+add_executable(make_vocabulary examples/make_vocabulary.cpp)
+target_link_libraries(make_vocabulary slam)
+add_executable(test_vocabulary examples/test_vocabulary.cpp)
+target_link_libraries(test_vocabulary slam)

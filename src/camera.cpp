@@ -3,14 +3,14 @@
 #include "misc.h"
 
 Camera::Camera() {}
-Camera::Camera(Settings settings)
+Camera::Camera(Settings &settings)
     : fx(settings.fx),
       fy(settings.fy),
       cx(settings.cx),
       cy(settings.cy),
       bf(settings.bf),
-      width(settings.width),
-      height(settings.height)
+      width(settings.imgWidth),
+      height(settings.imgHeight)
 {
   // clang-format off
   K = (cv::Mat_<double>(3, 3) << fx, 0, cx, 

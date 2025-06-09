@@ -9,9 +9,10 @@
     "clangd.detectExtensionConflicts": false,
     "C_Cpp.autocomplete": "disabled",
     "C_Cpp.intelliSenseEngine": "disabled",
-    "clangd.path": "/usr/lib/llvm-12/bin/clangd",
-    "editor.fontSize": 17,
-    "terminal.integrated.fontSize": 15
+    // "clangd.path": "/usr/lib/llvm-12/bin/clangd",
+    "clangd.path": "/usr/bin/clangd",
+    // "terminal.integrated.fontSize": 16,
+    "editor.lineHeight": 1.5
     
 
 }

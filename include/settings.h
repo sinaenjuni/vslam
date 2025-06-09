@@ -4,39 +4,56 @@
 
 struct Settings
 {
+  // 3d viewer settings
+  std::string window_name;
+  int windowWidth;
+  int windowHeight;
+  int ViewpointX;
+  int ViewpointY;
+  float ViewpointZ;
+  int ViewpointF;
+
+  // sensor type
   std::string sensor_type;
+
   // camera information
-  int width;
-  int height;
+  int imgWidth;
+  int imgHeight;
   float fx;
   float fy;
   float cx;
   float cy;
-  double bf;
+  float bf;
+
+  float k1;
+  float k2;
+  float p1;
+  float p2;
 
   // image and time data
-  std::string img_path;
-  std::string imgr_path;
-  std::string timestamp_path;
+  std::string imgPath;
+  std::string imgrPath;
+  std::string timestampPath;
   std::vector<float> timestamp;
 
-  // feature
-  int n_levels;
-  int n_points;
-  int feature_size;
-  double scale_factor;
-  std::vector<double> scale2_factors;
-  std::vector<double> scale2inv_factors;
-  int max_tracking_size;
+  // image feature
+  int nLevels;
+  int nPoints;
+  int featureSize;
+  float scaleFactor;
+  std::vector<float> scale2Factors;
+  std::vector<float> scale2InvFactors;
 
   // optimization
-  double kChi2Mono;
-  double kChi2Stereo;
-  double cos_max_parallax;
-  double scale_consistency_factor;
+  float cos_max_parallax;
+  float scale_consistency_factor;
   int desired_median_depth;
+  // float kChi2Mono;
+  // float kChi2Stereo;
+  float chi_square_threshold;
+  bool use_verbose;
+  bool use_robust_kernel;
 
   void print() const;
+  static Settings prase_settings(const std::string &yaml_file_path);
 };
-
-Settings prase_settings(const std::string &yaml_file_path);

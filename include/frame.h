@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <opencv2/core/cvstd_wrapper.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
 #include <unordered_map>
@@ -29,7 +30,7 @@ class KeyFrame
   int id = -1;
   int N = -1;
 
-  std::vector<size_t> mvGrid[GRID_COLS][GRID_ROWS];
+  std::vector<size_t> mvGrid[GRID_ROWS][GRID_COLS];
 
   // KeyPoints, normalized KeyPoints and, descriptors
   std::vector<cv::KeyPoint> mvKps;
@@ -48,12 +49,13 @@ class KeyFrame
 
   std::unordered_map<MapPointID, ImgPointIdx> observedPoints;
 
-  void assignFeaturesToGrid();
-  bool calcPosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+  void setKpsToGrid();
+  bool getPosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 
  public:
   KeyFrame();
   KeyFrame(const cv::Mat &img, FastOrbExtractor *featureExtractor);
+  KeyFrame(const cv::Mat &img, cv::Ptr<cv::ORB> featureExtractor);
   KeyFrame(
       cv::Mat &kps,
       cv::Mat &kpsn,
@@ -76,9 +78,14 @@ class KeyFrame
       const float &k2);
 
   inline const int getID() const { return this->id; };
-  // a front const means that not change output value at calling area
-  // a back const means guarantee that not change the member variables inside
-  // this function.
+  inline const int getN() const { return this->N; }
+  std::vector<size_t> getKpsInGrid(
+      const float &x,
+      const float &y,
+      const float &r,
+      const int minLevel,
+      const int maxLevel) const;
+
   inline const int get_nkps() const { return this->kps.rows; };
 
   // inline const cv::Mat &getKps() const { return this->kps; };
@@ -151,7 +158,7 @@ class KeyFrame
   };
 
   const cv::Mat get_descriptor(const cv::Mat &indices) const;
-  const cv::Mat &getDescriptor() const
+  const cv::Mat &getDescriptors() const
   {
     // cv::Mat ret;
     // mDescriptors.copyTo(ret);

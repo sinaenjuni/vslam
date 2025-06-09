@@ -1,10 +1,12 @@
 #include "geometry.h"
 
+#include <cstddef>
 #include <opencv2/core.hpp>
 #include <opencv2/core/mat.hpp>
 
+#include "camera.h"
 #include "entities.h"
-#include "key_frame.h"
+#include "frame.h"
 #include "map_point.h"
 #include "misc.h"
 #include "settings.h"
@@ -29,12 +31,17 @@ void estimatePoseWithEssentialMatrix(
   cv::Mat E, inlier;
   // Calculate a transformation matrix from the points1 to the points`2.
   E = cv::findEssentialMat(
-      points1, points2, 1.0, cv::Point2d(0, 0),
+      points1,
+      points2,
+      1.0,
+      cv::Point2d(0, 0),
       //  cv::RANSAC, 0.999, 0.0004, inlier);
-      cv::RANSAC, 0.999, 0.004, inlier);
+      cv::RANSAC,
+      0.999,
+      0.004,
+      inlier);
   // PRINT(E);
 
-  // cv::Mat R, t;
   cv::recoverPose(E, points1, points2, R, t, 1.0, cv::Point2d(0, 0), inlier);
   // PRINT(R);
   // PRINT(t);
@@ -58,13 +65,15 @@ std::vector<MapPointPtr> triangulate(
     const KeyFramePtr keyFrame2,
     const cv::Mat &indMask1,
     const cv::Mat &indMask2,
-    const Settings settings)
+    const Camera &camera,
+    const Settings &settings)
 {
   cv::Mat points4d;
   cv::triangulatePoints(
-      keyFrame1->getTwc().inverse()(4, 3).to_cvmat(),
-      keyFrame2->getTwc().inverse()(4, 3).to_cvmat(),
-      keyFrame1->getKpsn(indMask1).t(), keyFrame2->getKpsn(indMask2).t(),
+      keyFrame1->getPmat(),
+      keyFrame2->getPmat(),
+      keyFrame1->getKpsn(indMask1).t(),
+      keyFrame2->getKpsn(indMask2).t(),
       points4d);
   points4d = points4d.t();
   // points4d = points4d / cv::repeat(points4d.col(3), 1, 4);
@@ -76,9 +85,11 @@ std::vector<MapPointPtr> triangulate(
 
   // calculate reprojection points
   cv::Mat kpsReprojected1, depth1;
-  keyFrame1->projectWorld2Image(points4d, kpsReprojected1, depth1);
+  keyFrame1->projectWorld2Frame(points4d, kpsReprojected1, depth1);
+  camera.project(kpsReprojected1, kpsReprojected1);
   cv::Mat kpsReprojected2, depth2;
-  keyFrame2->projectWorld2Image(points4d, kpsReprojected2, depth2);
+  keyFrame2->projectWorld2Frame(points4d, kpsReprojected2, depth2);
+  camera.project(kpsReprojected2, kpsReprojected2);
 
   // check negative depth
   cv::Mat bad_depth1 = depth1 < 0;
@@ -98,8 +109,10 @@ std::vector<MapPointPtr> triangulate(
   reprojectionError2 =
       reprojectionError2.mul(keyFrame2->getSigma2inv(indMask2));
 
-  cv::Mat bad_reprojection_cur = reprojectionError1 > settings.kChi2Mono;
-  cv::Mat bad_reprojection_ref = reprojectionError2 > settings.kChi2Mono;
+  cv::Mat bad_reprojection_cur =
+      reprojectionError1 > settings.chi_square_threshold;
+  cv::Mat bad_reprojection_ref =
+      reprojectionError2 > settings.chi_square_threshold;
 
   // check cos parallex
   cv::Mat ray1, normRayPerRow1, normRay1;
@@ -125,7 +138,7 @@ std::vector<MapPointPtr> triangulate(
 
   // check scale consistency
   double scale_consistency_ratio =
-      settings.scale_consistency_factor * settings.scale_factor;
+      settings.scale_consistency_factor * settings.scaleFactor;
   cv::Mat scaled_depth_cur = keyFrame1->getSigma2(indMask1).mul(depth1);
   cv::Mat consistency_scaled_depth_cur =
       scaled_depth_cur * scale_consistency_ratio;
@@ -152,19 +165,38 @@ std::vector<MapPointPtr> triangulate(
 
     cv::Vec4d point4d = points4d.row(i);
 
-    cv::Vec<uint8_t, 32> descriptor = keyFrame1->getDescriptor().row(i);
+    cv::Vec<uint8_t, 32> descriptor = keyFrame1->getDescriptors().row(i);
     MapPointPtr mapPoint = std::make_shared<MapPoint>(
         PosD{point4d.val[0], point4d.val[1], point4d.val[2]}, descriptor);
 
-    mapPoint->addObservation(keyFrame1->getID());
-    mapPoint->addObservation(keyFrame2->getID());
+    mapPoint->addObservation(keyFrame1, indMask1.at<size_t>(i));
+    mapPoint->addObservation(keyFrame2, indMask2.at<size_t>(i));
 
-    keyFrame1->addObservation(mapPoint->getID(), indMask1.at<int>(i));
-    keyFrame2->addObservation(mapPoint->getID(), indMask2.at<int>(i));
+    keyFrame1->addObservation(mapPoint->getID(), indMask1.at<size_t>(i));
+    keyFrame2->addObservation(mapPoint->getID(), indMask2.at<size_t>(i));
 
     ret.push_back(mapPoint);
   }
 
+  return ret;
+}
+
+double calcMedianDepth(KeyFramePtr keyFrame, std::vector<MapPointPtr> points4d)
+{
+  cv::Mat listOfPoint4d(points4d.size(), 4, CV_64F);
+  for (size_t i = 0; i < points4d.size(); ++i)
+  {
+    listOfPoint4d.at<double>(i, 0) = points4d[i]->getPos().x;
+    listOfPoint4d.at<double>(i, 1) = points4d[i]->getPos().y;
+    listOfPoint4d.at<double>(i, 2) = points4d[i]->getPos().z;
+    listOfPoint4d.at<double>(i, 3) = 1;
+  }
+
+  cv::Mat Twc2 = keyFrame->getTwc().row(2);
+  cv::Mat sortedDepth = (Twc2 * listOfPoint4d.t()).t();
+  cv::sort(sortedDepth, sortedDepth, cv::SORT_EVERY_COLUMN);
+  int n = sortedDepth.rows / 2;
+  double ret = sortedDepth.at<double>(n);
   return ret;
 }
 }  // namespace Geometry

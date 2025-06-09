@@ -1,9 +1,15 @@
+# ------------------------------------------------------------------------------ 
+# Sensorr Settings
+# ------------------------------------------------------------------------------
 
-# Monocular or Stereo
+# sensor types [ Monocular / Stereo ]
 sensor_type: Monocular
+
 # camera information
-width: 1241
-height: 376
+img_width: 1241
+img_height: 376
+img_type: 0 # [0 | 1 | 2], GRAY, RGB, BGR
+
 fx: 718.856
 fy: 718.856
 cx: 607.1928
@@ -12,21 +18,30 @@ cy: 185.2157
 # [R|t] = K^-1 @ P2
 baseline_with_fx: -386.1448
 
+k1: 0.0
+k2: 0.0
+p1: 0.0
+p2: 0.0
+
 # image and time data
 img_path: "../data/KITTI/sequences/00/image_0/%06d.png"
 imgr_path: "../data/KITTI/sequences/00/image_1/%06d.png"
 timestamp_path: "../data/KITTI/sequences/00/times.txt"
 
-# feature
+# ------------------------------------------------------------------------------ 
+# ORB Feature Settings
+# ------------------------------------------------------------------------------
+
+# image feature
 n_levels: 8
 n_points: 2000
 feature_size: 30
 scale_factor: 1.2
-max_tracking_size: 3
-
 
 # optimization
-
+cos_max_parallax: 0.99998
+scale_consistency_factor: 1.5
+desired_median_depth: 15
 # chi-square is a evaluation criteria. Chi-square is defined as the sum of 
 # squares of n variables that follow the normal distribution. Therefore, 
 # assuming that the error follows the normal distribution, it follows 
@@ -37,8 +52,21 @@ max_tracking_size: 3
 # the more biased it is. In the case of a monocular image, since it has two 
 # independent variables, x and y, the degree of freedom is 2, of which 
 # the confidence interval is 95% and the value corresponding to p=0.05 is used.
-kChi2Mono: 5.991 # chi-square 2 DOFs, used for reprojection error  (Hartley Zisserman pg 119)
-kChi2Stereo: 7.815 # chi-square 3 DOFs, used for reprojection error  (Hartley Zisserman pg 119)
-cos_max_parallax: 0.99998
-scale_consistency_factor: 1.5
-desired_median_depth: 15
+# kChi2Mono: 5.991 # chi-square 2 DOFs, used for reprojection error  (Hartley Zisserman pg 119)
+# kChi2Stereo: 7.815 # chi-square 3 DOFs, used for reprojection error  (Hartley Zisserman pg 119)
+chi_square_threshold: 5.991 # [ 5.991 / 7.815 ]
+use_verbose: true
+use_robust_kernel: true
+
+
+# ------------------------------------------------------------------------------ 
+# 3D Viewer Settings
+# ------------------------------------------------------------------------------
+window_name: "Visual slam 3D viewer"
+window_width: 1024
+window_height: 768
+
+ViewpointX: 0
+ViewpointY: -100
+ViewpointZ: -0.1
+ViewpointF: 2000

@@ -2,9 +2,10 @@
 
 #include <opencv2/core/mat.hpp>
 
-#include "key_frame.h"
+#include "frame.h"
 
 class Settings;
+class Camera;
 
 namespace Geometry
 {
@@ -17,9 +18,12 @@ void estimatePoseWithEssentialMatrix(
     cv::Mat &t);
 
 std::vector<MapPointPtr> triangulate(
-    const KeyFramePtr frame1,
-    const KeyFramePtr frame2,
-    const cv::Mat &idx_match1,
-    const cv::Mat &idx_match2,
-    const Settings settings);
+    const KeyFramePtr keyFrame1,
+    const KeyFramePtr keyFrame2,
+    const cv::Mat &indMask1,
+    const cv::Mat &indMask2,
+    const Camera &camera,
+    const Settings &settings);
+
+double calcMedianDepth(KeyFramePtr keyFrame, std::vector<MapPointPtr> points4d);
 }  // namespace Geometry
