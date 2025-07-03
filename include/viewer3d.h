@@ -1,7 +1,7 @@
 #pragma once
 #include <pangolin/pangolin.h>
 
-#include <vector>
+
 
 class Map;
 class Settings;
@@ -17,14 +17,14 @@ class Viewer3D
   float ViewpointZ;
   int ViewpointF;
 
-  Map &map;
+  Map *mpMap;
   //   std::vector<Key_frame> key_frames;
   //   std::vector<Map_point> map_points;
   std::atomic<bool> is_running;
 
  public:
   // Viewer3D();
-  Viewer3D(Settings settings, Map &map);
+  Viewer3D(Settings settings, Map *pMap);
   ~Viewer3D();
   // void setup(
   //     std::string window_name = "Visual slam",
@@ -51,12 +51,14 @@ class Viewer3D
   //     // clang-format on
 
   //     key_frames.push_back(Key_frame_DO{
-  //         (Eigen::Matrix4d() << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 10, 0, 0, 0, 1).finished()
+  //         (Eigen::Matrix4d() << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 10, 0, 0, 0,
+  //         1).finished()
   //         // Color(0.0, 0.0, 1.0)
   //     });
 
   //     key_frames.push_back(Key_frame_DO{
-  //         (Eigen::Matrix4d() << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 20, 0, 0, 0, 1).finished()
+  //         (Eigen::Matrix4d() << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 20, 0, 0, 0,
+  //         1).finished()
   //         // Color(0.0, 0.0, 1.0)
   // });
   // }

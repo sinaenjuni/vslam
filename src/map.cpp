@@ -1,7 +1,40 @@
 #include "map.h"
 
-#include "camera.h"
+#include <mutex>
 
+#include "settings.h"
+
+Map::Map() {}
+Map::Map(Settings settings)
+    : chiThreshold(settings.chi_square_threshold),
+      scale_factor(settings.scaleFactor),
+      scale_consistency_factor(settings.scale_consistency_factor),
+      cos_max_parallax(settings.cos_max_parallax)
+{
+}
+Map::~Map() {}
+void Map::addKeyFrame(KeyFrame *pKeyFrame)
+{
+  std::unique_lock<std::mutex> lock(mutexSetterGetter);
+  this->keyFrames.insert(pKeyFrame);
+}
+void Map::addMapPoint(MapPoint *mapPoint)
+{
+  std::unique_lock<std::mutex> lock(mutexSetterGetter);
+  this->mapPoints.insert(mapPoint);
+};
+std::vector<KeyFrame *> Map::getAllKFs()
+{
+  std::unique_lock<std::mutex> lock(mutexSetterGetter);
+  return std::vector<KeyFrame *>(
+      this->keyFrames.begin(), this->keyFrames.end());
+}
+std::vector<MapPoint *> Map::getAllMPs()
+{
+  std::unique_lock<std::mutex> lock(mutexSetterGetter);
+  return std::vector<MapPoint *>(
+      this->mapPoints.begin(), this->mapPoints.end());
+}
 // void Map::add_map_points(
 //     const KeyFrame *const frame1,
 //     const KeyFrame *const frame2,
@@ -69,12 +102,14 @@
 //   // check scale consistency
 //   double scale_consistency_ratio =
 //       this->scale_consistency_factor * this->scale_factor;
-//   cv::Mat scaled_depth_cur = frame1->get_sigma2(idx_frame1).mul(proj_depth1);
-//   cv::Mat consistency_scaled_depth_cur =
+//   cv::Mat scaled_depth_cur =
+//   frame1->get_sigma2(idx_frame1).mul(proj_depth1); cv::Mat
+//   consistency_scaled_depth_cur =
 //       scaled_depth_cur * scale_consistency_ratio;
 
-//   cv::Mat scaled_depth_ref = frame2->get_sigma2(idx_frame2).mul(proj_depth2);
-//   cv::Mat consistency_scaled_depth_ref =
+//   cv::Mat scaled_depth_ref =
+//   frame2->get_sigma2(idx_frame2).mul(proj_depth2); cv::Mat
+//   consistency_scaled_depth_ref =
 //       scaled_depth_ref * scale_consistency_ratio;
 
 //   cv::Mat bad_scale_consistency =

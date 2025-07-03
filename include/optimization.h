@@ -1,4 +1,4 @@
-#include <g2o/types/slam3d/se3quat.h>
+#include <g2o/types/sba/types_six_dof_expmap.h>
 
 #include <Eigen/Dense>
 
@@ -7,14 +7,19 @@
 class Converter
 {
  public:
-  static g2o::SE3Quat toSE3Quat(const cv::Mat &cvMat);
-  static Eigen::Matrix<double, 3, 1> toVector3d(const PosD &pos);
+  static g2o::SE3Quat ToSE3Quat(const cv::Mat &cvMat);
+  static Eigen::Matrix<double, 3, 1> ToVector3d(const PosD &pos);
+  static Eigen::Matrix<double, 3, 1> ToVector3d(const cv::Mat &pos);
+  static cv::Mat ToCvMat(const g2o::SE3Quat SE3);
+  static cv::Mat ToCvMat(const Eigen::Matrix<double, 4, 4> &m);
+  static cv::Mat ToCvMat(const Eigen::Matrix<double, 3, 1> &m);
 };
-
+class Map;
 class Optimizer
 {
  public:
-  static void bundleAdjustment(
+  static void GlobalBundleAdjustment(Map *pMap, uint iterators);
+  static void BundleAdjustment(
       const std::vector<KeyFramePtr> &keyFrames,
       const std::vector<MapPointPtr> &mapPoints,
       int nIterations);

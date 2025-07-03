@@ -32,24 +32,27 @@
 // bool compare(const fs::path a, const fs::path b);
 // bool check_file_extensions(const fs::path &file);
 
-namespace Misc
+class Misc
 {
-void draw_kps(
-    const cv::Mat &img,
-    const std::vector<cv::KeyPoint> &kps,
-    cv::Scalar color = cv::Scalar(255, 0, 0));
+ public:
+  static void draw_kps(
+      const cv::Mat &img,
+      const std::vector<cv::KeyPoint> &kps,
+      cv::Scalar color = cv::Scalar(255, 0, 0));
 
-void draw_kps(
-    const cv::Mat &img,
-    const cv::Mat &kps,
-    cv::Scalar color = cv::Scalar(255, 0, 0));
+  static void draw_kps(
+      const cv::Mat &img,
+      const cv::Mat &kps,
+      cv::Scalar color = cv::Scalar(255, 0, 0));
 
-void draw_line(
-    cv::Mat &img,
-    const cv::Mat kps_cur,
-    const cv::Mat kps_ref,
-    cv::Scalar color = cv::Scalar(0, 255, 0));
-}  // namespace Misc
+  static void draw_line(
+      cv::Mat &img,
+      const cv::Mat kps_cur,
+      const cv::Mat kps_ref,
+      cv::Scalar color = cv::Scalar(0, 255, 0));
+
+  static std::vector<cv::Mat> splitToVectorFromCvMat(const cv::Mat &input);
+};
 
 namespace Matrix
 {

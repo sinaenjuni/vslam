@@ -6,7 +6,9 @@
 #include <mutex>
 #include <vector>
 
+#include "frame.h"
 #include "map.h"
+#include "misc.h"
 #include "settings.h"
 
 // Viewer3D::Viewer3D() : is_running(true)
@@ -85,7 +87,7 @@
 //     0, 0, 1, 5,
 //     0, 0, 0, 1).finished());
 // }
-Viewer3D::Viewer3D(Settings settings, Map &map)
+Viewer3D::Viewer3D(Settings settings, Map *pMap)
     : window_name(settings.window_name),
       window_width(settings.windowWidth),
       window_height(settings.windowHeight),
@@ -94,7 +96,7 @@ Viewer3D::Viewer3D(Settings settings, Map &map)
       ViewpointZ(settings.ViewpointZ),
       ViewpointF(settings.ViewpointF),
       is_running(true),
-      map(map)
+      mpMap(pMap)
 
 {
   pangolin::CreateWindowAndBind(window_name, window_width, window_height);
@@ -144,7 +146,15 @@ void Viewer3D::run()
           0.1,
           1000),
       pangolin::ModelViewLookAt(
-          this->ViewpointX, this->ViewpointY, this->ViewpointZ, 0, 0, 0, 0.0, -1.0, 0.0));
+          this->ViewpointX,
+          this->ViewpointY,
+          this->ViewpointZ,
+          0,
+          0,
+          0,
+          0.0,
+          -1.0,
+          0.0));
 
   // Define Projection and initial ModelView matrix
   // ProjectionMatrix arguemnts
@@ -153,15 +163,15 @@ void Viewer3D::run()
 
   // Create Interactive View in window
   pangolin::Handler3D handler(s_cam);
-  pangolin::View &d_cam =
-      pangolin::CreateDisplay()
-          .SetBounds(
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              -static_cast<double>(this->window_width) / static_cast<double>(this->window_height))
-          .SetHandler(&handler);
+  pangolin::View &d_cam = pangolin::CreateDisplay()
+                              .SetBounds(
+                                  0.0,
+                                  1.0,
+                                  0.0,
+                                  1.0,
+                                  -static_cast<double>(this->window_width) /
+                                      static_cast<double>(this->window_height))
+                              .SetHandler(&handler);
 
   glPointSize(3);
   Eigen::Matrix3d K;
@@ -176,21 +186,24 @@ void Viewer3D::run()
     pangolin::glDrawAxis(1);
     // pangolin::glDrawFrustum(Kinv, 1241, 376, 1.0);
 
-    for (const auto &[id, keyFrame] : this->map.getKeyFrames())
+    for (const auto &keyFrame : this->mpMap->getAllKFs())
     {
       // glColor3f(key_frame.color.red, key_frame.color.green,
       // key_frame.color.blue); glColor3f(1., 1., 1.);
-      pangolin::glDrawFrustum(Kinv, 1241, 376, keyFrame->getTwcEigen(), 1.0);
-      s_cam.Follow(keyFrame->getTwcEigen(), true);
+      pangolin::glDrawFrustum(
+          Kinv, 1241, 376, keyFrame->getPoseEigenInv(), 1.0);
+      s_cam.Follow(keyFrame->getPoseEigenInv(), true);
     }
 
     glBegin(GL_POINTS);
-    for (const auto &[id, mapPoint] : this->map.getMapPoints())
+    for (const auto &mapPoint : this->mpMap->getAllMPs())
     {
       // glColor3f(map_point.color.red, map_point.color.green,
       // map_point.color.blue);
-      PosD pos = mapPoint->getPos();
-      glVertex3d(pos.x, pos.y, pos.z);
+      // PosD pos = mapPoint->getPos();
+      cv::Mat pos = mapPoint->getPos();
+      // glVertex3d(pos.x, pos.y, pos.z);
+      glVertex3f(pos.at<double>(0), pos.at<double>(1), pos.at<double>(2));
       // glVertex3f(1.0,1.0,1.0);
       // PRINT(map_point.x, map_point.x, map_point.z);
     }

@@ -60,7 +60,7 @@ constexpr float HISTO_FACTOR = 1.0f / static_cast<float>(HISTO_LENGTH);
 //  00 11 00 11 (&)
 //  00 00 00 01
 
-static int descriptorDistance(const cv::Mat &a, const cv::Mat &b)
+int Matcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
   const int *pa = a.ptr<int32_t>();
   const int *pb = b.ptr<int32_t>();
@@ -79,7 +79,7 @@ static int descriptorDistance(const cv::Mat &a, const cv::Mat &b)
                 // 비트까지를 표현한다.
 }
 
-static void computeThreeMaxima(
+void Matcher::computeThreeMaxima(
     std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3)
 {
   int max1 = 0;
@@ -132,140 +132,6 @@ Matcher::Matcher(float ratioTest, bool checkOrientation)
 {
 }
 Matcher::~Matcher() {}
-int Matcher::matching(
-    KeyFrame *F1,
-    KeyFrame *F2,
-    std::vector<int> &matchF1,
-    std::vector<int> &matchF2)
-{
-  // int nMatches = 0;
-  // std::vector<cv::KeyPoint> F1Kps = F1->getKps();
-  // std::vector<cv::KeyPoint> F2Kps = F2->getKps();
-  // // std::vector<int> vnMatched21(F2Kps.size(), -1);
-  // matchF1 = std::vector<int>(F1Kps.size(), -1);
-  // matchF2 = std::vector<int>(F2Kps.size(), -1);
-
-  // std::vector<int> rotHist[HISTO_LENGTH];
-  // for (int i = 0; i < HISTO_LENGTH; i++)
-  // {
-  //   rotHist[i].reserve(500);
-  // }
-
-  // std::vector<int> vMatchedDistance(F2Kps.size(), INT_MAX);
-
-  // for (size_t i1 = 0; i1 < F1Kps.size(); ++i1)
-  // {
-  //   // cv::KeyPoint kp1 = F1Kps[i1];
-  //   int level1 = F1Kps[i1].octave;
-  //   if (level1 > 0) continue;
-
-  //   cv::Mat d1 = F1->getDescriptors().row(i1);
-
-  //   int bestDist = INT_MAX;
-  //   int secondBestDist = INT_MAX;
-  //   int bestIdx = -1;
-
-  //   for (size_t i2 = 0; i2 < F2Kps.size(); ++i2)
-  //   {
-  //     // cv::KeyPoint kp2 = F2Kps[i2];
-  //     int level2 = F2Kps[i2].octave;
-  //     if (level2 > 0) continue;
-
-  //     cv::Mat d2 = F2->getDescriptors().row(i2);
-  //     int dist = descriptorDistance(d1, d2);
-
-  //     if (vMatchedDistance[i2] <= dist)
-  //     // 현재 프레임을 기준으로 kp1과 kp2의 거리
-  //     {
-  //       continue;
-  //     }
-
-  //     if (dist < bestDist)
-  //     {
-  //       secondBestDist = bestDist;
-  //       bestDist = dist;
-  //       bestIdx = i2;  // 현재 프레임의 kp의 index
-  //     }
-  //     else if (dist < secondBestDist)
-  //     {
-  //       secondBestDist = dist;
-  //     }
-  //   }
-
-  //   if (bestDist <= TH_HIGH)
-  //   // bestDist가 TH_HIGH보다 작고
-  //   {
-  //     if (bestDist < (float)secondBestDist * mfRatioTest)
-  //     // bestDist가 bestDist2 * ratioTest보다 작으면,
-  //     {
-  //       if (vMatchedDistance[bestIdx] >= 0)
-  //       {
-  //         matchF1[matchF2[bestIdx]] = -1;
-  //         --nMatches;
-  //       }
-  //       matchF1[i1] = bestIdx;
-  //       // marchF1[index of reference frame] = ones of current frame
-  //       matchF2[bestIdx] = i1;
-  //       // marchF2[index of current frame] = ones of reference frame
-  //       vMatchedDistance[bestIdx] = bestDist;
-  //       nMatches++;
-
-  //       if (mbCheckOrientation)
-  //       {
-  //         float rot = F1Kps[i1].angle - F1Kps[bestIdx].angle;
-  //         if (rot < 0.0)  // 시계 방향은 +, 반시계 방향은 -를 의미
-  //         {
-  //           rot += 360;  // -20 -> +340와 같이 시계 방향을 기준으로
-  //           통일시키기
-  //                        // 위해 360을 더한다.
-  //         }
-  //         int bin = round(rot * HISTO_FACTOR);
-  //         if (bin == HISTO_LENGTH)
-  //         {
-  //           bin = 0;
-  //         }
-  //         assert(bin >= 0 && bin < HISTO_LENGTH);
-  //         rotHist[bin].push_back(i1);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // if (mbCheckOrientation)
-  // {
-  //   int ind1 = -1;
-  //   int ind2 = -1;
-  //   int ind3 = -1;
-
-  //   computeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-  //   for (int i = 0; i < HISTO_LENGTH; i++)
-  //   {
-  //     if (i == ind1 || i == ind2 || i == ind3) continue;
-  //     for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-  //     {
-  //       int idx1 = rotHist[i][j];
-  //       if (matchF1[idx1] >= 0)
-  //       // 이전 프레임과 매칭된 점이 있다면 이걸 없앤다.
-  //       // 주요한 회전 성분을 가지고 있는 포인트만 살린다는 의미로 파악된다.
-  //       {
-  //         matchF1[idx1] = -1;
-  //         nMatches--;
-  //       }
-  //     }
-  //   }
-
-  //   // for (size_t i1 = 0, iend1 = matchF1.size(); i1 < iend1; ++i1)
-  //   // {
-  //   //   if (matchF1[i1] >= 0)
-  //   //   {
-  //   //     vbPrevMatched[i1] = F2.mvKeysUn[vnMatches12[i1]].pt;
-  //   //   }
-  //   // }
-  // }
-  // return nMatches;
-  return 0;
-}
 
 // int Matcher::knnMatch(
 //     KeyFrame *F1,  // train
@@ -322,7 +188,7 @@ int Matcher::matching(
 //   return nMatches;
 // }
 
-int Matcher::knnMatch(
+int Matcher::matchInGrid(
     KeyFrame *F1,  // train
     KeyFrame *F2,  // query
     std::vector<int> &matchF1,
@@ -364,7 +230,7 @@ int Matcher::knnMatch(
     for (const size_t &i2 : vIndInGrid)
     {
       cv::Mat d2 = F2->getDescriptors().row(i2);
-      int dist = descriptorDistance(d1, d2);
+      int dist = DescriptorDistance(d1, d2);
       if (vDistances[i2] <= dist)
       {
         continue;  // 현재 프레임을 기준으로 kp1과 kp2의 거리

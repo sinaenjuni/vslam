@@ -1,18 +1,24 @@
+#include <bow.h>
 #include <opencv2/core/hal/interface.h>
 
 #include <cstddef>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/cvstd_wrapper.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/opencv.hpp>
+#include <vector>
 
 #include "entities.h"
-#include "extractor.h"
+// #include "extractor.h"
 #include "geometry.h"
+#include "map.h"
+#include "map_point.h"
 #include "matcher.h"
 #include "misc.h"
+#include "optimization.h"
 #include "vslam.h"
 
 cv::Scalar octaveToColor(int octave, int maxOctave = 8)
@@ -31,7 +37,13 @@ void vslam_main()
       Settings::prase_settings("../settings/KITTI_Monocular.yaml");
   settings.print();
 
+  OrbVocabularyForTxtFile *orbVocabulary = new OrbVocabularyForTxtFile();
+  bool bVocabluary = orbVocabulary->loadFromTextFile("ORBvoc.txt");
+  PRINT("Vocabulary loaded: ", bVocabluary);
+
   KeyFrame::initStaticVariables(
+      settings.nLevels,
+      settings.scaleFactor,
       settings.imgWidth,
       settings.imgHeight,
       settings.fx,
@@ -45,8 +57,8 @@ void vslam_main()
 
   // Camera camera = Camera(settings);
 
-  Map map(settings);
-  Viewer3D viewer3d(settings, map);
+  Map *pMap = new Map(settings);
+  Viewer3D viewer3d(settings, pMap);
   std::thread viewer_thread = viewer3d.runWithThread(viewer3d);
 
   // FastOrbExtractor *feature_extractor = new FastOrbExtractor(
@@ -78,8 +90,8 @@ void vslam_main()
   // cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
 
   // Tracker tracker;
-  KeyFramePtr lastKeyFrame = nullptr;
-  bool is_init = false;
+  // KeyFramePtr lastKeyFrame = nullptr;
+  // bool is_init = false;
   cv::Mat grayImg, colorImg;
   KeyFrame *framePrev = nullptr;
 
@@ -92,7 +104,8 @@ void vslam_main()
     }
     cv::cvtColor(grayImg, colorImg, cv::COLOR_GRAY2BGR);
 
-    KeyFrame *frameCur = new KeyFrame(grayImg, feature_extractor);
+    KeyFrame *frameCur =
+        new KeyFrame(grayImg, feature_extractor, orbVocabulary);
 
     if (framePrev == nullptr)
     {
@@ -152,22 +165,143 @@ void vslam_main()
     //   }
     // }
 
-    std::vector<int> matchPrev, matchCur;
-    int nMatches = matcher->knnMatch(framePrev, frameCur, matchPrev, matchCur);
-    PRINT(nMatches);
+    std::vector<int> match1, match2;  // 2000
+    int nMatches = matcher->matchInGrid(framePrev, frameCur, match1, match2);
+    PRINT("nMatches", nMatches);
 
     if (nMatches < 100)
     {
       PRINT("Not enough matches, skipping frame.");
-      delete frameCur;
+      framePrev = frameCur;
       continue;
     }
 
-    cv::Mat Rwc, twc;
-    std::vector<bool> vbTriangulated;
-    
+    std::vector<cv::Point2f> points1, points2;  // 200
+    for (size_t i = 0; i < match2.size(); ++i)
+    {
+      if (match2[i] >= 0)
+      {
+        points1.push_back(framePrev->getKps()[match2[i]].pt);
+        points2.push_back(frameCur->getKps()[i].pt);
+      }
+    }
 
+    cv::Mat Rcw, tcw;
+    std::vector<uchar> inliersF;  // 200
+    cv::Mat F = cv::findFundamentalMat(
+        points1, points2, cv::FM_RANSAC, 3.0, 0.99, inliersF);
+    cv::Mat E = frameCur->K.t() * F * frameCur->K;
+    cv::recoverPose(E, points1, points2, frameCur->K, Rcw, tcw, inliersF);
 
+    // The matrix R is the rotation matrix that transforms from wolrd to camera.
+    std::vector<cv::Point2d> inlierPoints1, inlierPoints2;
+    for (size_t i = 0, c = 0; i < match2.size(); ++i)
+    {
+      if (match2[i] >= 0 && inliersF[c++])
+      {
+        inlierPoints1.push_back(framePrev->getKps()[match2[i]].pt);
+        inlierPoints2.push_back(frameCur->getKps()[i].pt);
+      }
+      else
+      {
+        match2[i] = -1;
+      }
+    }
+
+    framePrev->setPose(cv::Mat::eye(4, 4, CV_64F));
+    frameCur->setPose(Rcw, tcw);
+
+    cv::Mat points4D;
+    cv::triangulatePoints(
+        framePrev->getP(),
+        frameCur->getP(),
+        inlierPoints1,
+        inlierPoints2,
+        points4D);
+    for (size_t i = 0, c = 0; i < match2.size(); ++i)
+    {
+      if (match2[i] >= 0)
+      {
+        cv::Mat X = points4D.col(c++);
+        X /= X.at<double>(3);
+
+        MapPoint *mp = new MapPoint(
+            cv::Mat(X.rowRange(0, 3)),
+            frameCur->getDescriptors().row(i),
+            frameCur);
+
+        mp->addObservation(framePrev, match2[i]);
+        mp->addObservation(frameCur, i);
+        mp->updateDescriptor();
+        mp->updateNormalAndDepth();
+
+        framePrev->addMapPoint(mp, match2[i]);
+        frameCur->addMapPoint(mp, i);
+        pMap->addMapPoint(mp);
+      }
+    }
+
+    framePrev->computeBoW();
+    frameCur->computeBoW();
+
+    pMap->addKeyFrame(framePrev);
+    pMap->addKeyFrame(frameCur);
+    framePrev->updateConnections();
+    frameCur->updateConnections();
+
+    Optimizer::GlobalBundleAdjustment(pMap, 20);
+
+    // std::vector<uchar> inliersH;
+    // cv::Mat H = cv::findHomography(
+    //     points1, points2, cv::RANSAC, 3.0, inliersH, 200, 0.995);
+    // int scoreH = cv::countNonZero(inliersH);
+    // PRINT(scoreH);
+    // std::vector<cv::Mat> Rs, ts, normals;
+    // int solutions = cv::decomposeHomographyMat(H, frameCur->K, Rs, ts,
+    // normals); PRINT(solutions); int maxNPositiveDepth = 0; for (size_t i
+    // = 0; i < solutions; ++i)
+    // {
+    //   Rs[i].convertTo(Rs[i], CV_32F);
+    //   ts[i].convertTo(ts[i], CV_32F);
+
+    //   cv::Mat P1 = framePrev->K * cv::Mat::eye(3, 4, CV_32F);
+    //   cv::Mat Rt = cv::Mat::eye(3, 4, CV_32F);
+    //   Rs[i].copyTo(Rt(cv::Rect(0, 0, 3, 3)));
+    //   ts[i].copyTo(Rt(cv::Rect(3, 0, 1, 3)));
+    //   cv::Mat P2 = framePrev->K * Rt;  // 두 번째 카메라: K*[R|t]
+
+    //   cv::Mat points4D;
+    //   cv::triangulatePoints(P1, P2, points1, points2, points4D);
+
+    //   int nPositiveDepth = 0;
+    //   for (size_t j = 0; j < points4D.cols; ++j)
+    //   {
+    //     cv::Mat X1 = points4D.col(j);
+    //     X1 /= X1.at<float>(3);
+    //     float Z1 = X1.at<float>(2);
+
+    //     cv::Mat X2 = Rs[i] * X1.rowRange(0, 3) + ts[i];
+    //     float Z2 = X2.at<float>(2);
+    //     if (Z1 > 0 && Z2 > 0)
+    //     {
+    //       nPositiveDepth++;
+    //     }
+    //   }
+    //   if (nPositiveDepth > maxNPositiveDepth)
+    //   {
+    //     maxNPositiveDepth = nPositiveDepth;
+    //     Rs[i].copyTo(Rwc);
+    //     ts[i].copyTo(twc);
+    //   }
+    // }
+
+    // for (size_t i = 0; i < points4D.rows; ++i)
+    // {
+    //   cv::Mat X = points4D.col(i);
+    //   X /= X.at<float>(3);
+    //   map.addMapPoint(new MapPoint(
+    //       cv::Mat(X.rowRange(0, 3)), frameCur->getDescriptors().row(i)));
+    // }
 
     // for (size_t queryIdx = 0; queryIdx < nMatches; ++queryIdx)
     // {
@@ -208,7 +342,7 @@ void vslam_main()
     // }
     // cv::FAST(grayImg, kps2, 30, true);
     // std::vector<int> nPointsPerLevel(settings.nLevels, 0);
-    for (size_t idxCur = 0; idxCur < matchCur.size(); ++idxCur)
+    for (size_t idxCur = 0; idxCur < match2.size(); ++idxCur)
     {
       // PRINT(kps2[i].size, kps2[i].angle, kps2[i].response,
       // kps2[i].octave);
@@ -220,7 +354,7 @@ void vslam_main()
       //     octaveToColor(kps2[i].octave),
       //     -1,
       //     cv::LINE_AA);
-      const int idxPrev = matchCur[idxCur];
+      const int idxPrev = match2[idxCur];
       if (idxPrev == -1)
       {
         continue;

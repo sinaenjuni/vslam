@@ -1,7 +1,5 @@
 #pragma once
 
-#include <opencv2/core/types.hpp>
-#include <opencv2/opencv.hpp>
 #include <vector>
 
 #include "frame.h"
@@ -59,7 +57,7 @@ class FastOrbExtractor
 
   std::vector<cv::KeyPoint> detectPerLevel(
       const cv::Mat &img, const int &level, const int &nPoints);
-  bool extract(const cv::Mat &img, KeyFramePtr keyFrame);
+  bool extract(const cv::Mat &img, KeyFrame *keyFrame);
   float get_scale2inv(const int octave) const;
   float get_scale2(const int octave) const;
   std::vector<int> getNPointsPerLevels();

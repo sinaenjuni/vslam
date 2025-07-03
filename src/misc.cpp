@@ -37,9 +37,7 @@ cv::Mat slice_cvmat(const cv::Mat &input, const cv::Mat &indices)
 }
 }  // namespace Matrix
 
-namespace Misc
-{
-void draw_kps(
+void Misc::draw_kps(
     const cv::Mat &img,
     const std::vector<cv::KeyPoint> &kps,
     const cv::Scalar color)
@@ -50,7 +48,8 @@ void draw_kps(
   }
 }
 
-void draw_kps(const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
+void Misc::draw_kps(
+    const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
 {
   for (size_t i = 0; i < kps.rows; i++)
   {
@@ -64,7 +63,7 @@ void draw_kps(const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
   }
 }
 
-void draw_line(
+void Misc::draw_line(
     cv::Mat &img,
     const cv::Mat kps_cur,
     const cv::Mat kps_ref,
@@ -82,4 +81,13 @@ void draw_line(
   }
 }
 
-}  // namespace Misc
+std::vector<cv::Mat> Misc::splitToVectorFromCvMat(const cv::Mat &input)
+{
+  std::vector<cv::Mat> ret;
+  ret.reserve(input.rows);
+  for (int i = 0; i < input.rows; ++i)
+  {
+    ret.push_back(input.row(i));
+  }
+  return ret;
+}

@@ -1,24 +1,29 @@
 #include "frame.h"
 
-#include <opencv2/core/hal/interface.h>
-
-#include <cmath>
 #include <cstddef>
-#include <opencv2/core/cvstd_wrapper.hpp>
-#include <opencv2/core/fast_math.hpp>
-#include <opencv2/core/mat.hpp>
-#include <opencv2/core/types.hpp>
-#include <opencv2/features2d.hpp>
+#include <map>
+#include <opencv2/core/eigen.hpp>
+#include <utility>
+#include <vector>
 
-#include "extractor.h"
+#include "DBoW2.h"
+#include "map_point.h"
 #include "misc.h"
 
-int getKeyFrameID()
+unsigned long getKeyFrameID()
 {
-  static int _KEY_FRAME_ID = -1;
+  static unsigned long _KEY_FRAME_ID = -1;
   return ++_KEY_FRAME_ID;
 }
-
+// bool compareKFsConnections(std::string a, std::string b)
+// {
+//   int numberA =
+//       std::stoi(fs::path(a).filename().replace_extension("").string());
+//   int numberB =
+//       std::stoi(fs::path(b).filename().replace_extension("").string());
+//   return a < b;
+//   // if this function returns false, exchage the position of a and b.
+// }
 void computeUndistoredImageBounds(
     const int &imgWidth,
     const int &imgHeight,
@@ -80,7 +85,8 @@ void computeUndistoredImageBounds(
   }
   return;
 }
-
+int KeyFrame::nLevels = 0;
+float KeyFrame::scaleFactor = 0.0;
 float KeyFrame::minX = 0.0;
 float KeyFrame::minY = 0.0;
 float KeyFrame::maxX = 0.0;
@@ -89,31 +95,55 @@ float KeyFrame::fx = 0.0;
 float KeyFrame::fy = 0.0;
 float KeyFrame::cx = 0.0;
 float KeyFrame::cy = 0.0;
+std::vector<float> KeyFrame::scaleFactors = std::vector<float>();
+std::vector<float> KeyFrame::invScaleFactors2 = std::vector<float>();
 cv::Mat KeyFrame::K = cv::Mat();
 cv::Mat KeyFrame::distCoef = cv::Mat();
 float KeyFrame::gridColsInv = 0.0;
 float KeyFrame::gridRowsInv = 0.0;
-
-KeyFrame::KeyFrame() : id(getKeyFrameID()), Twc(cv::Mat::eye(4, 4, CV_64F)) {}
-KeyFrame::KeyFrame(const cv::Mat &img, FastOrbExtractor *featureExtractor)
+float KeyFrame::getInvScaleFactors2(const int level)
 {
-  featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
-  N = mvKps.size();
-  PRINT("KeyFrame::KeyFrame", N);
-  // featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
-
-  // featureExtractor->detectAndCompute(img, mvKps);
-  // N = mvKps.size();
-  // mvMapPoints = std::vector<MapPoint *>(N, nullptr);
-  // assignFeaturesToGrid();
+  return invScaleFactors2[level];
 }
 
-KeyFrame::KeyFrame(const cv::Mat &img, cv::Ptr<cv::ORB> featureExtractor)
+KeyFrame::KeyFrame() : mID(getKeyFrameID()), mbFirstConnections(false)
+// mTcw(cv::Mat::eye(4, 4, CV_64F)),
+// mTwc(cv::Mat::eye(4, 4, CV_64F)),
+// mOw(cv::Mat::zeros(3, 1, CV_64F))
+{
+}
+
+// KeyFrame::KeyFrame(const cv::Mat &img, FastOrbExtractor *featureExtractor)
+// {
+// featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+// N = mvKps.size();
+// PRINT("KeyFrame::KeyFrame", N);
+// this->Twc = cv::Mat::eye(4, 4, CV_32F);
+// featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+
+// featureExtractor->detectAndCompute(img, mvKps);
+// N = mvKps.size();
+// mvMapPoints = std::vector<MapPoint *>(N, nullptr);
+// assignFeaturesToGrid();
+// }
+
+KeyFrame::KeyFrame(
+    const cv::Mat &img,
+    cv::Ptr<cv::ORB> featureExtractor,
+    OrbVocabulary *pOrbVocabulary)
+    : KeyFrame()
 {
   featureExtractor->detectAndCompute(img, cv::noArray(), mvKps, mDescriptors);
-  N = mvKps.size();
-  PRINT("KeyFrame::KeyFrame", N);
+  this->mN = mvKps.size();
+  this->mvMapPoints =
+      std::vector<MapPoint *>(this->mN, static_cast<MapPoint *>(nullptr));
+  this->mvTrackedkps = std::vector<bool>(this->mN, false);
+  this->mTcw = cv::Mat::eye(4, 4, CV_64F);
+  this->mTwc = cv::Mat::eye(4, 4, CV_64F);
+  this->mOw = cv::Mat::zeros(3, 1, CV_64F);
+
   setKpsToGrid();
+  mpOrbVocabulary = pOrbVocabulary;
 
   // PRINT("KeyFrame::KeyFrame", mvKps.size());
   // featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
@@ -124,51 +154,45 @@ KeyFrame::KeyFrame(const cv::Mat &img, cv::Ptr<cv::ORB> featureExtractor)
   // assignFeaturesToGrid();
 }
 
-KeyFrame::KeyFrame(
-    cv::Mat &kps,
-    cv::Mat &kpsn,
-    cv::Mat &descrptor,
-    cv::Mat &octave,
-    cv::Mat &sigma2,
-    cv::Mat &sigma2inv)
-    : KeyFrame()
-{
-  this->kps = kps;
-  this->kpsn = kpsn;
-  this->mDescriptors = descrptor;
-  this->octave = octave;
-  this->sigma2 = sigma2;
-  this->sigma2inv = sigma2inv;
-}
-
 void KeyFrame::initStaticVariables(
+    const int &nLevels,
+    const float &scaleFactor,
     const int &imgWidth,
     const int &imgHeight,
-    const float fx,
-    const float fy,
-    const float cx,
-    const float cy,
+    const float &fx,
+    const float &fy,
+    const float &cx,
+    const float &cy,
     const float &p1,
     const float &p2,
     const float &k1,
     const float &k2)
 {
-  KeyFrame::K = cv::Mat::eye(3, 3, CV_32F);
-  KeyFrame::K.at<float>(0, 0) = fx;
-  KeyFrame::K.at<float>(1, 1) = fy;
-  KeyFrame::K.at<float>(0, 2) = cx;
-  KeyFrame::K.at<float>(1, 2) = cy;
+  KeyFrame::K = cv::Mat::eye(3, 3, CV_64F);
+  KeyFrame::K.at<double>(0, 0) = fx;
+  KeyFrame::K.at<double>(1, 1) = fy;
+  KeyFrame::K.at<double>(0, 2) = cx;
+  KeyFrame::K.at<double>(1, 2) = cy;
 
   KeyFrame::fx = fx;
   KeyFrame::fy = fy;
   KeyFrame::cx = cx;
   KeyFrame::cy = cy;
 
-  KeyFrame::distCoef = cv::Mat(4, 1, CV_32F);
-  KeyFrame::distCoef.at<float>(0) = p1;
-  KeyFrame::distCoef.at<float>(1) = p2;
-  KeyFrame::distCoef.at<float>(2) = k1;
-  KeyFrame::distCoef.at<float>(3) = k2;
+  KeyFrame::nLevels = nLevels;
+  KeyFrame::scaleFactors = std::vector<float>(nLevels, 0);
+  KeyFrame::invScaleFactors2 = std::vector<float>(nLevels, 0);
+  for (size_t level = 0; level < nLevels; ++level)
+  {
+    scaleFactors[level] = std::pow(scaleFactor, level);
+    invScaleFactors2[level] = 1 / scaleFactors[level] * scaleFactors[level];
+  }
+
+  KeyFrame::distCoef = cv::Mat(4, 1, CV_64F);
+  KeyFrame::distCoef.at<double>(0) = p1;
+  KeyFrame::distCoef.at<double>(1) = p2;
+  KeyFrame::distCoef.at<double>(2) = k1;
+  KeyFrame::distCoef.at<double>(3) = k2;
 
   // cv::Mat matl(4, 2, CV_32F);
   // if (KeyFrame::distCoef.at<float>(0) != 0.0)
@@ -229,6 +253,16 @@ void KeyFrame::initStaticVariables(
                           (KeyFrame::maxY - KeyFrame::minY);
 }
 
+void KeyFrame::computeBoW()
+{
+  if (mBowVec.empty() || mFeatVec.empty())
+  {
+    std::vector<cv::Mat> vDescriptors =
+        Misc::splitToVectorFromCvMat(this->mDescriptors);
+    mpOrbVocabulary->transform(vDescriptors, mBowVec, mFeatVec, 4);
+  }
+}
+
 // KeyFrame::KeyFrame(const cv::Mat &img, Camera &camera, FAST_ORB_extractor
 // *feature_extractor)
 //     : KeyFrame()
@@ -282,6 +316,58 @@ void KeyFrame::initStaticVariables(
 // }
 
 KeyFrame::~KeyFrame() {}
+int KeyFrame::getID() const { return this->mID; }
+int KeyFrame::getN() const { return this->mvKps.size(); }
+std::vector<cv::KeyPoint> KeyFrame::getKps() const { return this->mvKps; }
+cv::Mat KeyFrame::getCameraCenter() const { return this->mOw.clone(); }
+cv::Mat KeyFrame::getDescriptors() const
+{
+  // cv::Mat ret;
+  // mDescriptors.copyTo(ret);
+  return this->mDescriptors;
+}
+void KeyFrame::setPose(const cv::Mat &Tcw)
+{
+  this->mTcw = Tcw.clone();
+
+  cv::Mat Rwc = Tcw(cv::Rect(0, 0, 3, 3)).t();
+  cv::Mat tcw = Tcw(cv::Rect(3, 0, 1, 3));
+  mOw = -Rwc * tcw;
+
+  mTwc = cv::Mat::eye(4, 4, CV_64F);
+  Rwc.copyTo(mTwc(cv::Rect(0, 0, 3, 3)));
+  mOw.copyTo(mTwc(cv::Rect(3, 0, 1, 3)));
+}
+void KeyFrame::setPose(const cv::Mat &Rcw, const cv::Mat &tcw)
+{
+  Rcw.copyTo(this->mTcw(cv::Rect(0, 0, 3, 3)));  // x y w h
+  tcw.copyTo(this->mTcw(cv::Rect(3, 0, 1, 3)));  // x y w h
+
+  cv::Mat Rwc = Rcw.t();
+  mOw = -Rwc * tcw;
+
+  mTwc = cv::Mat::eye(4, 4, CV_64F);
+  Rwc.copyTo(mTwc(cv::Rect(0, 0, 3, 3)));
+  mOw.copyTo(mTwc(cv::Rect(3, 0, 1, 3)));
+}
+cv::Mat KeyFrame::getPose() const { return this->mTcw.clone(); }
+cv::Mat KeyFrame::getPoseInv() const { return this->mTwc.clone(); }
+Eigen::Matrix4d KeyFrame::getPoseEigenInv() const
+{
+  Eigen::Matrix4d TwcEigen;
+  cv::cv2eigen(this->mTwc, TwcEigen);
+  return TwcEigen;
+}
+cv::Mat KeyFrame::getP() const
+{
+  // PRINT(KeyFrame::K.size(), mTwc(cv::Rect(0, 0, 3, 4)).size());
+  // PRINT(KeyFrame::K.type(), mTwc(cv::Rect(0, 0, 3, 4)).type());
+  return KeyFrame::K * mTcw(cv::Rect(0, 0, 4, 3));
+}
+void KeyFrame::addMapPoint(MapPoint *mp, size_t ImgIdx)
+{
+  this->mvMapPoints[ImgIdx] = mp;
+}
 
 // void Key_frame::project(
 //     const cv::Mat &points4d, cv::Mat &kpsi, cv::Mat &depth) const
@@ -292,29 +378,29 @@ KeyFrame::~KeyFrame() {}
 //   // camera->project(camera_coordinate_points.colRange(0, 3), kps, depth);
 // }
 
-void KeyFrame::projectFrame2World(
-    const cv::Mat &kpsFrame, cv::Mat &kpsWorld) const
-{
-  cv::Mat kpsFrameHomo =
-      Matrix::to_homogeneous(Matrix::to_homogeneous(kpsFrame));
-  kpsWorld = (this->Twc * kpsFrameHomo.t()).t();
-  kpsWorld = kpsWorld.colRange(0, 3);
-}
+// void KeyFrame::projectFrame2World(
+//     const cv::Mat &kpsFrame, cv::Mat &kpsWorld) const
+// {
+//   cv::Mat kpsFrameHomo =
+//       Matrix::to_homogeneous(Matrix::to_homogeneous(kpsFrame));
+//   kpsWorld = (this->Twc * kpsFrameHomo.t()).t();
+//   kpsWorld = kpsWorld.colRange(0, 3);
+// }
 
-void KeyFrame::projectWorld2Frame(
-    const cv::Mat &kpsWorld, cv::Mat &kpsFrame) const
-{
-  kpsFrame = (this->Twc.inv() * kpsWorld.t()).t();
-  kpsFrame = kpsFrame.colRange(0, 3);
-}
+// void KeyFrame::projectWorld2Frame(
+//     const cv::Mat &kpsWorld, cv::Mat &kpsFrame) const
+// {
+//   kpsFrame = (this->Twc.inv() * kpsWorld.t()).t();
+//   kpsFrame = kpsFrame.colRange(0, 3);
+// }
 
-void KeyFrame::projectWorld2Frame(
-    const cv::Mat &kpsWorld, cv::Mat &kpsFrame, cv::Mat &depth) const
-{
-  kpsFrame = (this->Twc.inv() * kpsWorld.t()).t();
-  kpsFrame.col(2).copyTo(depth);
-  kpsFrame = kpsFrame.colRange(0, 3);
-}
+// void KeyFrame::projectWorld2Frame(
+//     const cv::Mat &kpsWorld, cv::Mat &kpsFrame, cv::Mat &depth) const
+// {
+//   kpsFrame = (this->Twc.inv() * kpsWorld.t()).t();
+//   kpsFrame.col(2).copyTo(depth);
+//   kpsFrame = kpsFrame.colRange(0, 3);
+// }
 
 // void KeyFrame::projectWorld2Image(const cv::Mat &kpsWorld, cv::Mat &kpsImage)
 // const
@@ -410,7 +496,7 @@ const cv::Mat KeyFrame::get_descriptor(const cv::Mat &indices) const
 
 void KeyFrame::setKpsToGrid()
 {
-  int nReserve = 0.5f * N / (GRID_COLS * GRID_ROWS);
+  int nReserve = 0.5f * mN / (GRID_COLS * GRID_ROWS);
   for (size_t row = 0; row < GRID_ROWS; row++)
   {
     for (size_t col = 0; col < GRID_COLS; col++)
@@ -419,7 +505,7 @@ void KeyFrame::setKpsToGrid()
     }
   }
 
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < mN; i++)
   {
     const cv::KeyPoint &kp = mvKps[i];
     int posX, posY;
@@ -451,7 +537,7 @@ std::vector<size_t> KeyFrame::getKpsInGrid(
     const int maxLevel) const
 {
   std::vector<size_t> vIndices;
-  vIndices.reserve(N);
+  vIndices.reserve(mN);
 
   const float gridWidthInv = KeyFrame::gridColsInv;
   const float gridHeightInv = KeyFrame::gridRowsInv;
@@ -510,4 +596,141 @@ std::vector<size_t> KeyFrame::getKpsInGrid(
   }
 
   return vIndices;
+}
+void KeyFrame::addConnection(KeyFrame *pKF, int weight)
+{
+  {
+    std::unique_lock<std::mutex> lock(mMutexConnections);
+    if (!mConnectedKeyFrameWeights.count(pKF))
+      mConnectedKeyFrameWeights[pKF] = weight;
+    else if (mConnectedKeyFrameWeights[pKF] != weight)
+      mConnectedKeyFrameWeights[pKF] = weight;
+    else
+      return;
+  }
+
+  updateBestCovisibles();
+}
+void KeyFrame::updateBestCovisibles()
+{
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+  std::vector<std::pair<int, KeyFrame *>> vPairs;
+  vPairs.reserve(mConnectedKeyFrameWeights.size());
+  for (std::map<KeyFrame *, int>::iterator
+           mit = mConnectedKeyFrameWeights.begin(),
+           mend = mConnectedKeyFrameWeights.end();
+       mit != mend;
+       mit++)
+    vPairs.push_back(std::make_pair(mit->second, mit->first));
+
+  sort(vPairs.begin(), vPairs.end());
+  std::list<KeyFrame *> lKFs;
+  std::list<int> lWs;
+  for (size_t i = 0, iend = vPairs.size(); i < iend; i++)
+  {
+    lKFs.push_front(vPairs[i].second);
+    lWs.push_front(vPairs[i].first);
+  }
+
+  mvpOrderedConnectedKeyFrames =
+      std::vector<KeyFrame *>(lKFs.begin(), lKFs.end());
+  mvOrderedWeights = std::vector<int>(lWs.begin(), lWs.end());
+}
+void KeyFrame::addChild(KeyFrame *pKF)
+{
+  std::unique_lock<std::mutex> lockCon(mMutexConnections);
+  mspChildrens.insert(pKF);
+}
+void KeyFrame::updateConnections()
+{
+  std::map<KeyFrame *, int> KFsCounter;
+  std::vector<MapPoint *> vMPs;
+
+  {
+    // if need a mutex here
+    vMPs = mvMapPoints;  // 현재 프레임에서 보이는 MP
+  }
+
+  for (std::vector<MapPoint *>::iterator iterMP = vMPs.begin();
+       iterMP != vMPs.end();
+       ++iterMP)
+  {
+    MapPoint *pMP = *iterMP;
+    if (!pMP)
+    {
+      continue;
+    }
+    std::map<KeyFrame *, uvIdx> observations = pMP->getObservations();
+    // 현재 프레임에서 보이는 MP를 공유하는 KFs를 가져옴
+
+    for (std::map<KeyFrame *, uvIdx>::iterator iterObs = observations.begin();
+         iterObs != observations.end();
+         ++iterObs)
+    {
+      if (iterObs->first == this)
+      {
+        continue;  // skip self
+      }
+      ++KFsCounter[iterObs->first];
+    }
+  }
+
+  // This should not happen
+  if (KFsCounter.empty())
+  {
+    return;
+  }
+
+  int nMax = 0;
+  KeyFrame *pKFmax = static_cast<KeyFrame *>(nullptr);
+  std::vector<std::pair<int, KeyFrame *>> vPairs;
+  int th = 15;  // covisibility threshold
+  for (auto [pKF, nCount] : KFsCounter)
+  {
+    if (nCount < nMax)
+    {
+      nMax = nCount;
+      pKFmax = pKF;
+    }
+    if (nCount >= th)
+    {
+      vPairs.push_back(std::make_pair(nCount, pKF));
+      pKF->addConnection(this, nCount);
+    }
+  }
+
+  if (vPairs.empty())  // 만약 th보다 많은 MP를 공유하는 KF가 없다면, 가장 많은
+                       // MP를 공유하는 KF와 연결한다.
+  {
+    vPairs.push_back(std::make_pair(nMax, pKFmax));
+    pKFmax->addConnection(this, nMax);  // 가장 많은
+  }
+
+  sort(vPairs.begin(), vPairs.end());  // 오름차순 정렬 후
+  std::list<KeyFrame *> lKFs;
+  std::list<int> lWs;
+  for (size_t i = 0; i < vPairs.size(); i++)
+  {
+    lKFs.push_front(vPairs[i].second);  // 앞에서부터 저장 (내림차순 정렬)
+    lWs.push_front(vPairs[i].first);
+  }
+
+  {
+    std::unique_lock<std::mutex> lockCon(mMutexConnections);
+
+    // mspConnectedKeyFrames = spConnectedKeyFrames;
+    mConnectedKeyFrameWeights = KFsCounter;
+    mvpOrderedConnectedKeyFrames =
+        std::vector<KeyFrame *>(lKFs.begin(), lKFs.end());
+    mvOrderedWeights = std::vector<int>(lWs.begin(), lWs.end());
+
+    if (mbFirstConnections && mID != 0)
+    {
+      mpParentKF = mvpOrderedConnectedKeyFrames.front();
+      // 가장 많이 연결된 KF를 저장
+      mpParentKF->addChild(this);
+      // 가장 많은 MP를 공유하는 KF에 현재 KF를 자식으로 추가한다.
+      mbFirstConnections = false;  // 이 과정은 KF생성 후 최초 한 번만 수행된다.
+    }
+  }
 }

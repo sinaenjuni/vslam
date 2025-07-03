@@ -12,12 +12,10 @@ class Matcher
  public:
   Matcher(float ratioTest = 0.6f, bool checkOrientation = true);
   ~Matcher();
-  int matching(
-      KeyFrame *F1,
-      KeyFrame *F2,
-      std::vector<int> &matchF1,
-      std::vector<int> &matchF2);
-  int knnMatch(
+  static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
+  static void computeThreeMaxima(
+      std::vector<int> *histo, const int L, int &ind1, int &ind2, int &ind3);
+  int matchInGrid(
       KeyFrame *F1,
       KeyFrame *F2,
       std::vector<int> &matchF1,
