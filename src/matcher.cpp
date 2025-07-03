@@ -125,13 +125,18 @@ void Matcher::computeThreeMaxima(
   }
 }
 
-Matcher::Matcher(float ratioTest, bool checkOrientation)
-    : mfRatioTest(ratioTest),
+Matcher::Matcher(float testRatio, bool checkOrientation)
+    : mfTestRatio(testRatio),
       mbCheckOrientation(checkOrientation),
-      matcher(new cv::BFMatcher())
+      mMatcher(new cv::BFMatcher())
 {
 }
 Matcher::~Matcher() {}
+void Matcher::set(float testRatio, bool checkOrientation)
+{
+  mfTestRatio = testRatio;
+  mbCheckOrientation = checkOrientation;
+}
 
 // int Matcher::knnMatch(
 //     KeyFrame *F1,  // train
@@ -275,7 +280,7 @@ int Matcher::matchInGrid(
 
     if (bestDist <= TH_HIGH)
     {
-      if (bestDist < (float)secondBestDist * mfRatioTest)
+      if (bestDist < (float)secondBestDist * mfTestRatio)
       {
         if (matchF2[bestIdx] >= 0)
         {

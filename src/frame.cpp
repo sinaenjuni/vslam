@@ -368,6 +368,11 @@ void KeyFrame::addMapPoint(MapPoint *mp, size_t ImgIdx)
 {
   this->mvMapPoints[ImgIdx] = mp;
 }
+std::vector<MapPoint *> KeyFrame::getMapPoints()
+{
+  // if need mutex here
+  return this->mvMapPoints;
+}
 
 // void Key_frame::project(
 //     const cv::Mat &points4d, cv::Mat &kpsi, cv::Mat &depth) const

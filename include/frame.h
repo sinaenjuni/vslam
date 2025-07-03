@@ -121,6 +121,7 @@ class KeyFrame
   Eigen::Matrix4d getPoseEigenInv() const;
   void computeBoW();
   void addMapPoint(MapPoint *mp, size_t ImgIdx);
+  std::vector<MapPoint *> getMapPoints();
   void addConnection(KeyFrame *pKF, int weight);
   void updateBestCovisibles();
   void updateConnections();

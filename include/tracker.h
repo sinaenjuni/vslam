@@ -1,39 +1,59 @@
 #pragma once
 
-#include <cstddef>
-#include <memory>
+#include <opencv2/features2d.hpp>
+#include <opencv2/videoio.hpp>
 
 #include "frame.h"
+#include "settings.h"
 
+class Matcher;
+class Map;
 class Tracker;
+
 class TrackerState
 {
- public:
-  virtual void processFrame(Tracker& tracker, const KeyFrame* frame) = 0;
-  // pure vitual function.
-  virtual ~TrackerState() = default;
-  // delegate to compiler to make a destructor.
-};
+ protected:
+  Tracker *tracker_;
 
+ public:
+  virtual ~TrackerState() {};
+  void setContext(Tracker *system);
+  virtual void process(KeyFrame *pFrame) = 0;
+};
 class Tracker
 {
  private:
-  std::unique_ptr<TrackerState> state;
-  KeyFrame* lastFrame = nullptr;
+  TrackerState *state_;
 
  public:
-  Tracker(TrackerState* initState) : state(initState) {}
-  KeyFrame* getLastFrame() { return lastFrame; }
-  void setLastFrame(KeyFrame* lastFrame) { lastFrame = lastFrame; }
-  void setState(TrackerState* trackerState) { state.reset(trackerState); }
-  void processFrame(KeyFrame* frame) { state->processFrame(*this, frame); }
+  Settings settings;
+  cv::VideoCapture cap;
+  cv::Ptr<cv::ORB> featureExtractor;
+  OrbVocabulary *mpORBVocabulary;
+  KeyFrame *lastFrame;
+  Matcher *mpMatcher;
+  Map *mpMap;
+
+  Tracker(TrackerState *state, Matcher *pMatcher, Map *pMap);
+  Tracker(
+      TrackerState *state,
+      const Settings &settings,
+      cv::Ptr<cv::ORB> featureExtractor,
+      OrbVocabulary *pORBVocabulary);
+  ~Tracker();
+  void transitionTo(TrackerState *state);
+  void process(KeyFrame *pFrame);
 };
 
-class InitTrackingState : public TrackerState
+class MonocularInitState : public TrackerState
 {
  public:
-  void processFrame(Tracker& tracker, const KeyFrame* frame) override
-  {
-    tracker.getLastFrame();
-  }
+  MonocularInitState() {}
+  void process(KeyFrame *pFrame) override;
+};
+class TrackReferenceKeyFrame : public TrackerState
+{
+ public:
+  TrackReferenceKeyFrame() {}
+  void process(KeyFrame *pFrame) override;
 };

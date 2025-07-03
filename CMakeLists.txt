@@ -43,6 +43,7 @@ add_library(slam STATIC
     src/tracker.cpp    
     src/bow.cpp
     src/vslam.cpp
+    src/system.cpp
 )
 
 find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
