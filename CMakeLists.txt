@@ -5,27 +5,47 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g -O1")
-# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -O3")
+## Code optimization for the highest level at the release build time.
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g -O0") 
+## No code optimization at the debug build time
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g -O0 -fsanitize=address")
+# set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -fsanitize=address")
+# set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address")
+## No code optimization and check the memory  at the debug build time
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+## For the productivity of the development.
+# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+## It is not necessary to set the output directory for the library,
+## because of source directory pollution. (maybe remove it later.)
 
 # RPATH (Runtime Library Search Path) related options
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) 
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DDEBUG_MODE)
-endif()
+find_package(yaml-cpp REQUIRED  PATHS "${PROJECT_SOURCE_DIR}/thirdparty/yaml-cpp")
+find_package(Eigen3 REQUIRED PATHS "${PROJECT_SOURCE_DIR}/thirdparty/eigen3")
+find_package(OpenCV REQUIRED PATHS "${PROJECT_SOURCE_DIR}/thirdparty/opencv")
+find_package(g2o REQUIRED PATHS "${PROJECT_SOURCE_DIR}/thirdparty/g2o")
+find_package(DBoW2 REQUIRED PATHS "${PROJECT_SOURCE_DIR}/thirdparty/dbow2")
+find_package(Pangolin REQUIRED PATHS "${PROJECT_SOURCE_DIR}/thirdparty/pangolin")
 
-# set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-# set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-# include(CPack)
+message("yaml-cpp ${yaml-cpp_VERSION} found")
+message("Eigen3 ${Eigen3_VERSION} found")
+message("OpenCV ${OpenCV_VERSION} found")
+message("g2o ${g2o_VERSION} found")
+message("DBoW2 ${DBoW2_VERSION} found")
+message("Pangolin ${Pangolin_VERSION} found")
 
-include_directories(include)
-add_library(slam STATIC 
+include_directories(
+    include
+    ${OpenCV_INCLUDE_DIRS}
+    ${Eigen3_INCLUDE_DIRS}
+    ${DBoW2_INCLUDE_DIRS}
+    ) 
+add_library(slam SHARED 
     src/misc.cpp
     src/settings.cpp
     src/camera.cpp
@@ -46,85 +66,19 @@ add_library(slam STATIC
     src/system.cpp
 )
 
-find_package(yaml-cpp 0.8.0 EXACT REQUIRED PATHS "thirdparty/yaml-cpp")
-if(yaml-cpp_FOUND)
-    message("yaml-cpp ${yaml-cpp_VERSION} found")
-    target_link_libraries(slam PUBLIC yaml-cpp::yaml-cpp)
-else()
-    message("yaml-cpp not found")
-endif()
-
-find_package(Eigen3 REQUIRED PATHS "thirdparty/eigen3")
-if(Eigen3_FOUND)
-    message("Eigen3 ${Eigen3_VERSION} found")
-    target_link_libraries(slam PUBLIC Eigen3::Eigen)
-else()
-    message("Eigen3 not found")
-endif()
-
-find_package(OpenCV 4.11.0 EXACT REQUIRED PATHS "thirdparty/opencv")
-if(OpenCV_FOUND)
-    message("OpenCV ${OpenCV_VERSION} found")
-    target_link_libraries(slam PUBLIC ${OpenCV_LIBS})
-else()
-    message("OpenCV not found")
-endif()
-
-find_package(DBoW2 REQUIRED PATHS "thirdparty/dbow2")
-if(DBoW2_FOUND)
-    message("DBoW2 ${DBoW2_VERSION} found")
-    set(DBoW2_ROOT "${PROJECT_SOURCE_DIR}/thirdparty/dbow2")
-    target_include_directories(slam PUBLIC ${DBoW2_INCLUDE_DIRS})
-    target_link_libraries(slam PUBLIC ${DBoW2_LIBRARIES})
-    list(APPEND CMAKE_INSTALL_RPATH ${DBoW2_ROOT}/lib)
-    list(APPEND CMAKE_BUILD_RPATH ${DBoW2_ROOT}/lib)
-endif()
-
-set(G2O_ROOT "${PROJECT_SOURCE_DIR}/thirdparty/g2o")
-list(APPEND CMAKE_INSTALL_RPATH ${G2O_ROOT}/lib)
-list(APPEND CMAKE_BUILD_RPATH ${G2O_ROOT}/lib)
-include_directories(
-    ${G2O_ROOT}/include
-    ${G2O_ROOT}/include/g2o
+target_link_libraries(slam PUBLIC 
+    yaml-cpp::yaml-cpp
+    Eigen3::Eigen
+    ${OpenCV_LIBS}
+    g2o::core
+    g2o::stuff
+    g2o::types_sba
+    g2o::types_slam3d
+    g2o::solver_csparse
+    g2o::opengl_helper
+    ${DBoW2_LIBRARIES}
+    ${Pangolin_LIBRARIES}
 )
-link_directories(${G2O_ROOT}/lib)
-target_link_libraries(slam
-    PUBLIC
-    g2o_core
-    g2o_stuff
-    g2o_types_sba
-    g2o_types_slam3d
-    g2o_solver_csparse
-    cxsparse
-    g2o_opengl_helper
-)
-
-# find_package(g2o 1.0.0 EXACT REQUIRED PATHS "thirdparty/g2o")
-# if(g2o_FOUND)
-#     message("g2o ${g2o_VERSION} found")
-#     message("${}")
-#     # target_link_libraries(slam PUBLIC g2o::core)
-#     # target_include_directories(slam PUBLIC ${G2O_INCLUDE_DIR})
-#     # target_link_libraries(slam PUBLIC ${PROJECT_SOURCE_DIR}/thirdparty/g2o/lib/libg2o_cli.so)
-# endif()
-
-find_package(Pangolin 0.9.2 EXACT REQUIRED PATHS "thirdparty/pangolin")
-if(Pangolin_FOUND)
-    message("Pangolin ${Pangolin_VERSION} found")
-    target_link_libraries(slam PUBLIC ${Pangolin_LIBRARY})
-endif()
-
-# find_package(DLib REQUIRED PATHS "thirdparty/DBoW2")
-# if(DLib_FOUND)
-#     message("DLib ${DLib_VERSION} found")
-    # target_link_libraries(slam PUBLIC ${DLib_LIBRARIES})
-    # target_include_directories(slam PUBLIC ${DLib_INCLUDE_DIRS})
-# endif()
-
-
-# target_link_libraries(slam public ${PROJECT_SOURCE_DIR}/thirdparty/dbow2/lib/libDBoW2.so)
-
-
 
 add_executable(main examples/main.cpp)
 target_link_libraries(main slam)
@@ -132,3 +86,12 @@ add_executable(make_vocabulary examples/make_vocabulary.cpp)
 target_link_libraries(make_vocabulary slam)
 add_executable(test_vocabulary examples/test_vocabulary.cpp)
 target_link_libraries(test_vocabulary slam)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(slam PUBLIC DEBUG_MODE)
+    # Transfer the DEBUG_MODE flag to the target files.
+endif()
+
+# set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+# set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+# include(CPack)
