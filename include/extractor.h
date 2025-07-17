@@ -1,9 +1,7 @@
 #pragma once
 
+#include <opencv2/core/mat.hpp>
 #include <vector>
-
-#include "frame.h"
-#include "settings.h"
 
 // class Camera;
 
@@ -33,7 +31,7 @@ class FastOrbExtractor
   std::vector<int> mvNPointsPerLevels;
   std::vector<cv::Mat> mvImgPyramid;
 
-  int mFastMinThreshold;
+  int mMinFastThreshold;
   int mFastThreshold;
 
   std::vector<cv::Point> pattern;
@@ -46,8 +44,8 @@ class FastOrbExtractor
       int imgWidth,
       int imgHeight,
       float scaleFactor,
-      int fastMinThreathold = 7,
-      int fastThreathold = 20);
+      int minFastThreshold = 7,
+      int fastThreshold = 20);
   ~FastOrbExtractor();
   void makeImagePyramid(const cv::Mat &img);
   void detectAndCompute(
@@ -57,7 +55,6 @@ class FastOrbExtractor
 
   std::vector<cv::KeyPoint> detectPerLevel(
       const cv::Mat &img, const int &level, const int &nPoints);
-  bool extract(const cv::Mat &img, KeyFrame *keyFrame);
   float get_scale2inv(const int octave) const;
   float get_scale2(const int octave) const;
   std::vector<int> getNPointsPerLevels();

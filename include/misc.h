@@ -1,7 +1,7 @@
 #pragma once
 
-#include <filesystem>
-#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <opencv2/core/mat.hpp>
 #include <vector>
 
 // namespace fs = std::__fs::filesystem;
@@ -49,7 +49,12 @@ class Misc
       cv::Mat &img,
       const cv::Mat kps_cur,
       const cv::Mat kps_ref,
-      cv::Scalar color = cv::Scalar(0, 255, 0));
+      const cv::Scalar color = cv::Scalar(0, 255, 0));
+  static void draw_line(
+      cv::Mat &img,
+      const cv::KeyPoint kp1,
+      const cv::KeyPoint kp2,
+      const cv::Scalar color = cv::Scalar(0, 255, 0));
 
   static std::vector<cv::Mat> splitToVectorFromCvMat(const cv::Mat &input);
 };

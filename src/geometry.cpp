@@ -5,7 +5,6 @@
 #include <opencv2/core/mat.hpp>
 
 #include "camera.h"
-#include "entities.h"
 #include "frame.h"
 #include "map_point.h"
 #include "misc.h"

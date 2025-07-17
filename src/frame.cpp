@@ -2,11 +2,14 @@
 
 #include <cstddef>
 #include <map>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/features2d.hpp>
 #include <utility>
 #include <vector>
 
 #include "DBoW2.h"
+#include "extractor.h"
 #include "map_point.h"
 #include "misc.h"
 
@@ -154,6 +157,33 @@ KeyFrame::KeyFrame(
   // assignFeaturesToGrid();
 }
 
+KeyFrame::KeyFrame(
+    const cv::Mat &img,
+    FastOrbExtractor *featureExtractor,
+    OrbVocabulary *pOrbVocabulary)
+    : KeyFrame()
+{
+  featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+  this->mN = mvKps.size();
+  this->mvMapPoints =
+      std::vector<MapPoint *>(this->mN, static_cast<MapPoint *>(nullptr));
+  this->mvTrackedkps = std::vector<bool>(this->mN, false);
+  this->mTcw = cv::Mat::eye(4, 4, CV_64F);
+  this->mTwc = cv::Mat::eye(4, 4, CV_64F);
+  this->mOw = cv::Mat::zeros(3, 1, CV_64F);
+
+  setKpsToGrid();
+  mpOrbVocabulary = pOrbVocabulary;
+
+  // PRINT("KeyFrame::KeyFrame", mvKps.size());
+  // featureExtractor->detectAndCompute(img, mvKps, mDescriptors);
+
+  // featureExtractor->detectAndCompute(img, mvKps);
+  // N = mvKps.size();
+  // mvMapPoints = std::vector<MapPoint *>(N, nullptr);
+  // assignFeaturesToGrid();
+}
+
 void KeyFrame::initStaticVariables(
     const int &nLevels,
     const float &scaleFactor,
@@ -182,7 +212,7 @@ void KeyFrame::initStaticVariables(
   KeyFrame::nLevels = nLevels;
   KeyFrame::scaleFactors = std::vector<float>(nLevels, 0);
   KeyFrame::invScaleFactors2 = std::vector<float>(nLevels, 0);
-  for (size_t level = 0; level < nLevels; ++level)
+  for (int level = 0; level < nLevels; ++level)
   {
     scaleFactors[level] = std::pow(scaleFactor, level);
     invScaleFactors2[level] = 1 / scaleFactors[level] * scaleFactors[level];
@@ -317,10 +347,17 @@ void KeyFrame::computeBoW()
 
 KeyFrame::~KeyFrame() {}
 int KeyFrame::getID() const { return this->mID; }
-int KeyFrame::getN() const { return this->mvKps.size(); }
-std::vector<cv::KeyPoint> KeyFrame::getKps() const { return this->mvKps; }
+size_t KeyFrame::getN() const { return this->mvKps.size(); }
+const std::vector<cv::KeyPoint> &KeyFrame::getKps() const
+{
+  return this->mvKps;
+}
+const DBoW2::FeatureVector &KeyFrame::getFeatVec() const
+{
+  return this->mFeatVec;
+}
 cv::Mat KeyFrame::getCameraCenter() const { return this->mOw.clone(); }
-cv::Mat KeyFrame::getDescriptors() const
+const cv::Mat &KeyFrame::getDescriptors() const
 {
   // cv::Mat ret;
   // mDescriptors.copyTo(ret);
@@ -490,7 +527,7 @@ const cv::Mat KeyFrame::get_descriptor(const cv::Mat &indices) const
   cv::Mat ret = cv::Mat::zeros(
       indices.rows, this->mDescriptors.cols, this->mDescriptors.depth());
 
-  for (size_t i = 0; i < indices.rows; i++)
+  for (int i = 0; i < indices.rows; i++)
   {
     this->mDescriptors.row(i).copyTo(ret.row(i));
     // ret.at<double_t>(i) = this->sigma2.at<double_t>(indices.at<uint16_t>(i,
@@ -574,7 +611,7 @@ std::vector<size_t> KeyFrame::getKpsInGrid(
       // mGrid[posY][posX]
       if (vKpsInCell.empty()) continue;
 
-      for (const int &kpsInCell : vKpsInCell)
+      for (const size_t &kpsInCell : vKpsInCell)
       {
         const cv::KeyPoint &kp = mvKps[kpsInCell];
         if (bCheckLevels)

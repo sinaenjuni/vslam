@@ -69,7 +69,8 @@ void Settings::print() const
   // std::cout << "  Chi2 Mono: " << kChi2Mono << "\n";
   // std::cout << "  Chi2 Stereo: " << kChi2Stereo << "\n";
   std::cout << "  Cosine Max Parallax: " << cos_max_parallax << "\n";
-  std::cout << "  Scale Consistency Factor: " << scale_consistency_factor << "\n";
+  std::cout << "  Scale Consistency Factor: " << scale_consistency_factor
+            << "\n";
   std::cout << "  Desired Median Depth: " << desired_median_depth << "\n";
   std::cout << "  Chi Square  Threshold: " << chi_square_threshold << "\n";
   std::cout << "  Use Verbose: " << use_verbose << "\n";
@@ -122,7 +123,7 @@ Settings Settings::prase_settings(const std::string &yaml_file_path)
   settings.scale2Factors.resize(settings.nLevels);
   settings.scale2InvFactors.resize(settings.nLevels);
 
-  for (size_t i = 0; i < settings.nLevels; i++)
+  for (int i = 0; i < settings.nLevels; i++)
   {
     settings.scale2Factors[i] = std::pow(settings.scaleFactor, i);
     settings.scale2InvFactors[i] = 1 / settings.scale2Factors[i];
@@ -149,7 +150,8 @@ Settings Settings::prase_settings(const std::string &yaml_file_path)
   // settings.kChi2Mono = yaml_file["kChi2Mono"].as<float>();
   // settings.kChi2Stereo = yaml_file["kChi2Stereo"].as<float>();
   settings.cos_max_parallax = yaml_file["cos_max_parallax"].as<float>();
-  settings.scale_consistency_factor = yaml_file["scale_consistency_factor"].as<float>();
+  settings.scale_consistency_factor =
+      yaml_file["scale_consistency_factor"].as<float>();
   settings.desired_median_depth = yaml_file["desired_median_depth"].as<int>();
 
   settings.chi_square_threshold = yaml_file["chi_square_threshold"].as<float>();

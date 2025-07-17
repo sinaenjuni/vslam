@@ -1,5 +1,6 @@
 #pragma once
 
+#include <opencv2/core/mat.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/videoio.hpp>
 
@@ -18,7 +19,7 @@ class TrackerState
  public:
   virtual ~TrackerState() {};
   void setContext(Tracker *system);
-  virtual void process(KeyFrame *pFrame) = 0;
+  virtual bool process(KeyFrame *pFrame) = 0;
 };
 class Tracker
 {
@@ -33,6 +34,7 @@ class Tracker
   KeyFrame *lastFrame;
   Matcher *mpMatcher;
   Map *mpMap;
+  cv::Mat mVelocity;
 
   Tracker(TrackerState *state, Matcher *pMatcher, Map *pMap);
   Tracker(
@@ -43,17 +45,19 @@ class Tracker
   ~Tracker();
   void transitionTo(TrackerState *state);
   void process(KeyFrame *pFrame);
+  void calcVelocity(KeyFrame *pKF);
+  cv::Mat getNextPoseWithVelocity();
 };
 
 class MonocularInitState : public TrackerState
 {
  public:
   MonocularInitState() {}
-  void process(KeyFrame *pFrame) override;
+  bool process(KeyFrame *pFrame) override;
 };
 class TrackReferenceKeyFrame : public TrackerState
 {
  public:
   TrackReferenceKeyFrame() {}
-  void process(KeyFrame *pFrame) override;
+  bool process(KeyFrame *pFrame) override;
 };

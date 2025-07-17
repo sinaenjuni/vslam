@@ -5,9 +5,9 @@
 class Matcher
 {
  private:
-  cv::Ptr<cv::BFMatcher> mMatcher;
-  bool mbCheckOrientation;
   float mfTestRatio;
+  bool mbCheckOrientation;
+  cv::Ptr<cv::BFMatcher> mMatcher;
 
  public:
   Matcher(float ratioTest = 0.6f, bool checkOrientation = true);
@@ -22,7 +22,7 @@ class Matcher
       std::vector<int> &matchF1,
       std::vector<int> &matchF2);
   int matchInBow(
-      KeyFrame *F1, KeyFrame *F2, std::vector<MapPoint *> outMapPoints);
+      KeyFrame *F1, KeyFrame *F2, std::vector<MapPoint *> vMatchedMPs);
   int matchingForInitialization(
       KeyFrame &F1,
       KeyFrame &F2,

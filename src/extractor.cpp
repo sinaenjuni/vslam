@@ -2,7 +2,7 @@
 
 #include <opencv2/core/hal/interface.h>
 
-#include <cstddef>
+#include <cmath>
 #include <iterator>
 #include <opencv2/core.hpp>
 #include <opencv2/core/base.hpp>
@@ -14,16 +14,12 @@
 #include <opencv2/videoio.hpp>
 #include <vector>
 
-#include "entities.h"
-#include "frame.h"
 #include "misc.h"
 #include "quadtree.h"
 
 constexpr int PATCH_SIZE = 31;
 constexpr int HALF_PATCH_SIZE = 15;
 constexpr int BORDER_SIZE = 19;
-constexpr int INIT_FAST_TH = 20;
-constexpr int MIN_FAST_TH = 7;
 constexpr float PIinv = static_cast<float>(CV_PI / 180.0f);
 
 // https://github.com/opencv/opencv/blob/c248d4711078dbf3dfa7b1bb4f0ca9a799ec555c/modules/features2d/src/orb.cpp#L380
@@ -289,9 +285,11 @@ static int bit_pattern_31_[256 * 4] = {
 static float IC_Angle(
     const cv::Mat &image, const cv::Point2f &pt, const std::vector<int> &u_max)
 {
+  // The umax[] is the lookup table for calculating the Intensity centroid(IC).
+  // It stores the radius about the y-axis of a circle.
   int m_01 = 0, m_10 = 0;
-  int cx = cvRound(pt.x);
-  int cy = cvRound(pt.y);
+  const int cx = cvRound(pt.x);
+  const int cy = cvRound(pt.y);
 
   const uchar *center = &image.at<uchar>(cy, cx);
   // const uchar* variable is read-only
@@ -311,13 +309,13 @@ static float IC_Angle(
   {
     // Proceed over the two lines
     int v_sum = 0;
-    int d = u_max[v];  // [15, 15, 15, 15, 14, 14, 14, 13, 13, 12, 11, 10, 9, 8,
-                       // 6, 3]
+    const int d = u_max[v];  // [15, 15, 15, 15, 14, 14, 14, 13, 13, 12, 11, 10,
+                             // 9, 8, 6, 3]
     for (int u = -d; u <= d; ++u)
     // 해당 y축에 대해 x축으로 -d~d까지의 픽셀들에 대한 무게 중심 계산
     {
-      int val_plus = center[u + v * step], val_minus = center[u - v * step];
-      // (v,u) (-v,u)
+      const int val_plus = center[u + v * step];   // upper side
+      const int val_minus = center[u - v * step];  // under side
       v_sum += (val_plus - val_minus);
       m_10 += u * (val_plus + val_minus);
     }
@@ -327,36 +325,39 @@ static float IC_Angle(
   return cv::fastAtan2((float)m_01, (float)m_10);
 }
 
-static void computeOrientations(
-    const cv::Mat &image,
-    std::vector<cv::KeyPoint> &keypoints,
-    const std::vector<int> &umax)
-{
-  for (std::vector<cv::KeyPoint>::iterator keypoint = keypoints.begin(),
-                                           keypointEnd = keypoints.end();
-       keypoint != keypointEnd;
-       ++keypoint)
-  {
-    keypoint->angle = IC_Angle(image, keypoint->pt, umax);
-  }
-}
+// static void computeOrientations(
+//     const cv::Mat &image,
+//     std::vector<cv::KeyPoint> &keypoints,
+//     const std::vector<int> &umax)
+// {
+//   for (std::vector<cv::KeyPoint>::iterator keypoint = keypoints.begin(),
+//                                            keypointEnd = keypoints.end();
+//        keypoint != keypointEnd;
+//        ++keypoint)
+//   {
+//     keypoint->angle = IC_Angle(image, keypoint->pt, umax);
+//   }
+// }
 
 static void computeOrbDescriptor(
-    const cv::KeyPoint &kp,
     const cv::Mat &img,
+    const cv::KeyPoint &kp,
     const cv::Point *pattern,
     uchar *descriptor)
 {
-  float angle = (float)kp.angle * PIinv;
-  float a = (float)cos(angle), b = (float)sin(angle);
+  float radian = (float)kp.angle * PIinv;
+  float a = (float)cos(radian);
+  float b = (float)sin(radian);
 
   const uchar *center = &img.at<uchar>(cvRound(kp.pt.y), cvRound(kp.pt.x));
+  // Pointer of the center pixel.
   const int step = (int)img.step;
 
 #define GET_VALUE(idx)                                           \
   center                                                         \
       [cvRound(pattern[idx].x * b + pattern[idx].y * a) * step + \
        cvRound(pattern[idx].x * a - pattern[idx].y * b)]
+  //
 
   for (int i = 0; i < 32; ++i, pattern += 16)
   {
@@ -394,7 +395,7 @@ static void computeOrbDescriptor(
 
 void FastOrbExtractor::resizeWithLevel(cv::Mat &img, int &level)
 {
-  for (size_t level = 0; level < mNLevels; level++)
+  for (int level = 0; level < mNLevels; level++)
   {
     mvImgPyramid[level] = img;
     // resize using scale factor
@@ -413,20 +414,20 @@ FastOrbExtractor::FastOrbExtractor(
     int imgWidth,
     int imgHeight,
     float scaleFactor,
-    int fastMinThreshold,
+    int minFastThreshold,
     int fastThreshold)
     : mNPoints(nPoints),
       mNLevels(nLevels),
       mImgWidth(imgWidth),
       mImgHeight(imgHeight),
       mScaleFactor(scaleFactor),
-      mFastMinThreshold(fastMinThreshold),
+      mMinFastThreshold(minFastThreshold),
       mFastThreshold(fastThreshold)
 {
   // reserve() function doesn't set the vector size.
   mvScaleFactors.resize(nLevels, -1);
   mvScaleFactorsInv.resize(nLevels, -1);
-  for (size_t level = 0; level < nLevels; ++level)
+  for (int level = 0; level < nLevels; ++level)
   {
     mvScaleFactors[level] = std::pow(scaleFactor, level);
     mvScaleFactorsInv[level] = 1.0 / mvScaleFactors[level];
@@ -438,7 +439,7 @@ FastOrbExtractor::FastOrbExtractor(
 
   mvNPointsPerLevels.resize(nLevels, -1);
   int sumOfnPointsPerLevel = 0;
-  for (size_t level = 0; level < nLevels - 1; ++level)
+  for (int level = 0; level < nLevels - 1; ++level)
   {
     mvNPointsPerLevels[level] = round(nPointsOfFirstLevel);
     nPointsOfFirstLevel *= mvScaleFactorsInv[1];
@@ -450,7 +451,7 @@ FastOrbExtractor::FastOrbExtractor(
 
   mvImgPyramid.resize(nLevels);
   // the reserve() function doesn't set the vector size.
-  // for (size_t level = 0; level < nLevels; level++)
+  // for (int level = 0; level < nLevels; level++)
   // {
   //   mvImgPyramid[level] = cv::Mat::zeros(imgHeight, imgWidth, CV_8UC1);
   //   // resize using scale factors.
@@ -466,7 +467,7 @@ FastOrbExtractor::FastOrbExtractor(
   // pre-compute the end of a row in a circular patch
   umax.resize(HALF_PATCH_SIZE + 1);
 
-  int v, v0, vmax = cvFloor(HALF_PATCH_SIZE * sqrt(2.f) / 2 + 1);  // 11
+  int v, v0, vmax = cvFloor(HALF_PATCH_SIZE * sqrt(2.f) / 2 + 1);  // 15
   // sqrt(2.f) / 2는 원을 8등분한 후(45도) 각 대간선의 최대 길이인 1/sqrt(2)를
   // 유리화 한것이다. x=y 같은 경우를 가정했으며, +1은 cvCeil(10.0000001)==11,
   // cvCeil(10.0)==10과 같이 항상 올림을 해주기 위해서 내림 함수에 +1을 사용해서
@@ -502,33 +503,28 @@ FastOrbExtractor::FastOrbExtractor(
 
 void FastOrbExtractor::makeImagePyramid(const cv::Mat &img)
 {
-  for (size_t level = 0; level < mNLevels; ++level)
+  for (int level = 0; level < mNLevels; ++level)
   {
     const float scaleFactorInv = mvScaleFactorsInv[level];
-    cv::Size imgPyramidSize(
+    cv::Size imgSize(
         cvRound(img.cols * scaleFactorInv), cvRound(img.rows * scaleFactorInv));
-    // scaleFactor가 적용된 image pyramid의 이미지 크기
-    cv::Size imgPyramidSizeWithBorder(
-        imgPyramidSize.width + BORDER_SIZE * 2,
-        imgPyramidSize.height + BORDER_SIZE * 2);
-    // scaleFactor와 border 크기가 적용된 이미지 크기
+    cv::Size imgSizeWithBorder(
+        imgSize.width + BORDER_SIZE * 2, imgSize.height + BORDER_SIZE * 2);
 
-    cv::Mat temp(imgPyramidSizeWithBorder, img.type());
-    // opencv는 같은 변수에 대한 in-place를 지원하지 않기 때문에 임시 변수를
-    // 사용해서 출력을 받는다.
-    mvImgPyramid[level] = temp(cv::Rect(
-        BORDER_SIZE, BORDER_SIZE, imgPyramidSize.width, imgPyramidSize.height));
-    // 얕은 참조를 이용하여 mvImgPyramid와 temp를 연결한다.
-    // temp는 BORDER 영역을 포함한 큰 메모리를 차지하고, mvImgPyramid는 원본
-    // 영상에 scale factor가 적용된 이미지 크기를 갖는다.
-    // mvImgPyramid[level].step을 통해 border 영역을 확인할 수 있다.
+    cv::Mat temp(imgSizeWithBorder, img.type());
+    // The OpenCV is not supporing in-place operation for the same variable,
+    // so we use a temporary variable to receive the output.
+    mvImgPyramid[level] =
+        temp(cv::Rect(BORDER_SIZE, BORDER_SIZE, imgSize.width, imgSize.height));
+    // Using shallow copy, we can avoid copying the data.
+    // also, we can check the border area using mvImgPyramid[level].step.
 
     if (level != 0)
     {
       cv::resize(
           mvImgPyramid[level - 1],
           mvImgPyramid[level],
-          imgPyramidSize,
+          imgSize,
           0,
           0,
           cv::INTER_LINEAR);
@@ -543,10 +539,10 @@ void FastOrbExtractor::makeImagePyramid(const cv::Mat &img)
           cv::BORDER_REFLECT_101 | cv::BORDER_ISOLATED);
     }
     else
-    {
+    {  // level == 0
       cv::copyMakeBorder(
           img,
-          temp,  // temp는 mvImgPyramid[level]의 메모리를 가르킴
+          temp,
           BORDER_SIZE,
           BORDER_SIZE,
           BORDER_SIZE,
@@ -559,273 +555,91 @@ void FastOrbExtractor::makeImagePyramid(const cv::Mat &img)
 void FastOrbExtractor::detectAndCompute(
     const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &descriptors)
 {
+  kps.resize(mNPoints);
+  descriptors.create(mNPoints, 32, CV_8UC1);
+
   makeImagePyramid(img);
-  // std::vector<std::vector<cv::KeyPoint>> kpsAllLevels;
-  // kpsAllLevels.resize(mNLevels);
-
-  // cv::Mat colorImg;
-  // cv::cvtColor(img, colorImg, cv::COLOR_GRAY2BGR);
-
-  const float W = 30;
-  // Divide the image into W x W patches.
-  // To prevent the key points from being concentrated in one place, with too
-  // many textures.
-
-  // std::vector<cv::KeyPoint> kpsTemp, kps3;
-  // cv::FAST(img, kpsTemp, 20, true);
-  // cv::Mat targetImg = mvImgPyramid[0];
+  const int W = 30;
   int offset = 0;
-
-  for (size_t level = 0; level < mNLevels; ++level)
+  for (int level = 0; level < mNLevels; ++level)
   {
-    const int minBorderX = BORDER_SIZE - 3;
-    const int minBorderY = BORDER_SIZE - 3;
-    const int maxBorderX = mvImgPyramid[level].cols - BORDER_SIZE + 3;
-    const int maxBorderY = mvImgPyramid[level].rows - BORDER_SIZE + 3;
+    int xminBorder = BORDER_SIZE + 1;
+    int yminBorder = BORDER_SIZE + 1;
+    int xmaxBorder = mvImgPyramid[level].cols - BORDER_SIZE - 1;
+    int ymaxBorder = mvImgPyramid[level].rows - BORDER_SIZE - 1;
 
-    const int width = (maxBorderX - minBorderX);
-    const int height = (maxBorderY - minBorderY);
-    // const int width = mvImgPyramid[level].cols;
-    // const int height = mvImgPyramid[level].rows;
+    const int width = xmaxBorder - xminBorder;
+    const int height = ymaxBorder - yminBorder;
 
     const int nCols = width / W;
     const int nRows = height / W;
+
     const int wCell = ceil(width / nCols);
     const int hCell = ceil(height / nRows);
 
-    descriptors.create(mNPoints, 32, CV_8UC1);
-
-    std::vector<cv::KeyPoint> vKpsPerLevel;
-    vKpsPerLevel.reserve(mNPoints * 10);
-    for (size_t row = 0; row < nRows; ++row)
+    std::vector<cv::KeyPoint> vKpsForDistribution;
+    vKpsForDistribution.reserve(mNPoints * 10);
+    for (int row = 0; row < nRows; ++row)
     {
-      float minY = minBorderY + row * hCell;
-      // float minY = row * hCell;
-      // float maxY = minY + hCell + 6;
-      // float maxY = minY + hCell;
-      float maxY = std::min(minY + hCell, static_cast<float>(maxBorderY));
-      // float maxY = std::min(minY + hCell, static_cast<float>(height));
+      int ymin = row * hCell + yminBorder;
+      int ymax = std::min(ymin + hCell, height);
 
-      // if (minY >= maxBorderY - 3) continue;
-      // if (minY >= height) continue;
-      // if (maxY > maxBorderY) maxY = maxBorderY;
-      // if (maxY > height) maxY = height;
-
-      for (size_t col = 0; col < nCols; ++col)
+      for (int col = 0; col < nCols; ++col)
       {
-        float minX = minBorderX + col * wCell;
-        // float minX = col * wCell;
-        // int maxX = minX + wCell + 6;
-        // float maxX = minX + wCell;
-        float maxX = std::min(minX + wCell, static_cast<float>(maxBorderX));
-        // float maxX = std::min(minX + wCell, static_cast<float>(width));
-
-        // if (minX >= maxBorderX - 6) continue;
-        // if (minX >= width) continue;
-        // if (maxX > maxBorderX) maxX = maxBorderX;
-        // if (maxX > width) maxX = width;
-
-        std::vector<cv::KeyPoint> vKpsCell;
+        int xmin = col * wCell + xminBorder;
+        int xmax = std::min(xmin + wCell, width);
+        std::vector<cv::KeyPoint> kpsCell;
         cv::FAST(
-            mvImgPyramid[level].rowRange(minY, maxY).colRange(minX, maxX),
-            vKpsCell,
+            mvImgPyramid[level].rowRange(ymin, ymax).colRange(xmin, xmax),
+            kpsCell,
             mFastThreshold,
             true);
-
-        if (vKpsCell.empty())
+        if (kpsCell.size() < mvNPointsPerLevels[level])
         {
           cv::FAST(
-              mvImgPyramid[level].rowRange(minY, maxY).colRange(minX, maxX),
-              vKpsCell,
-              mFastMinThreshold,
+              mvImgPyramid[level].rowRange(ymin, ymax).colRange(xmin, xmax),
+              kpsCell,
+              mMinFastThreshold,
               true);
         }
-
-        if (!vKpsCell.empty())
+        for (cv::KeyPoint &kp : kpsCell)
         {
-          for (std::vector<cv::KeyPoint>::iterator vit = vKpsCell.begin();
-               vit != vKpsCell.end();
-               vit++)
-          {
-            // (vit)->pt.x += col * wCell;
-            (vit)->pt.x += minX;
-            // (vit)->pt.y += row * hCell;
-            (vit)->pt.y += minY;
-            vKpsPerLevel.push_back(*vit);
-          }
+          kp.pt.x += xmin;
+          kp.pt.y += ymin;
+          vKpsForDistribution.push_back(kp);
         }
       }
     }
 
-    std::vector<cv::KeyPoint> kpsFiltered = QuadTree::rectifyKps(
-        vKpsPerLevel,
-        mvNPointsPerLevels[level],
-        minBorderX,
-        minBorderY,
-        maxBorderX,
-        maxBorderY);
-
-    computeOrientations(mvImgPyramid[level], kpsFiltered, umax);
-    // for (const cv::KeyPoint &kp : kpsFiltered)
-    // {
-    //   PRINT(kp.pt.x, kp.pt.y, kp.angle);
-    // }
-
-    // PRINT(static_cast<int>(mvImgPyramid[level].at<uchar>(-21, -21)));
-    // uchar pixelValue = mvImgPyramid[level].at<uchar>(-1, -1);
-    // std::cout << static_cast<int>(pixelValue)
-    // << std::endl;  // uchar은 숫자로 출력하려면 int로 변환해야 함
-
-    // PRINT(mvImgPyramid[level].at<uchar>(
-    // kpsFiltered[0].pt.y, kpsFiltered[0].pt.x));
-    // PRINT(img.at<uchar>(1300, 20));
-
-    cv::Mat targetImg = mvImgPyramid[level].clone();
+    cv::Mat blurImg = mvImgPyramid[level].clone();
     cv::GaussianBlur(
-        targetImg, targetImg, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
-    // PRINT(targetImg.step1(), targetImg.step, targetImg.cols, targetImg.rows);
-
-    for (size_t i = 0; i < kpsFiltered.size(); ++i)
+        blurImg, blurImg, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
+    // PRINT(mvImgPyramid[level].step1());
+    // PRINT("blurImg", blurImg.cols, blurImg.rows, blurImg.step1());
+    std::vector<cv::KeyPoint> kpsFiltered = QuadTree::rectifyKps(
+        vKpsForDistribution, mvNPointsPerLevels[level], 0, 0, width, height);
+    PRINT(
+        mvNPointsPerLevels[level],
+        kpsFiltered.size(),
+        vKpsForDistribution.size());
+    for (int i = 0; i < mvNPointsPerLevels[level]; ++i)
     {
-      // PRINT(i + offset);
+      cv::KeyPoint &kp = kpsFiltered[i];
       computeOrbDescriptor(
-          kpsFiltered[i], targetImg, &pattern[0], descriptors.ptr(i + offset));
-    }
-    offset += kpsFiltered.size();
-
-    // cv::Mat test = cv::Mat::zeros(kpsFiltered.size(), 32, CV_8UC1);
-    // descriptors = cv::Mat::zeros(kpsFiltered.size(), 32, CV_8UC1);
-    // computeOrbDescriptor(
-    //     kpsFiltered[0], targetImg, &pattern[0], descriptors.ptr(0));
-    // offset += kpsFiltered.size();
-
-    const int scaledPatchSize = PATCH_SIZE * mvScaleFactors[level];
-    for (cv::KeyPoint &kp : kpsFiltered)
-    {
-      kp.pt.x *= mvScaleFactors[level];
-      kp.pt.y *= mvScaleFactors[level];
+          blurImg, kp, &pattern[0], descriptors.ptr<uchar>(i + offset));
+      kp.angle = IC_Angle(mvImgPyramid[level], kp.pt, umax);
       kp.octave = level;
-      kp.size = scaledPatchSize;
-      kps.push_back(kp);
+      kp.size = PATCH_SIZE * mvScaleFactors[level];
+      kp.pt *= mvScaleFactors[level];
+      kps[i + offset] = kp;
     }
+    offset += mvNPointsPerLevels[level];
   }
 }
-
-// std::vector<cv::KeyPoint> FastOrbExtractor::detectPerLevel(
-//     const cv::Mat &img, const int &level, const int &nPoints)
-// {
-//   cv::resize(
-//       img,
-//       mvImgPyramid[level],
-//       cv::Size(),
-//       mvScaleFactorsInv[level],
-//       mvScaleFactorsInv[level]);
-
-//   std::vector<cv::KeyPoint> kps;
-//   cv::FAST(mvImgPyramid[level], kps, mFastThreshold, true);
-//   for (size_t i = 0; i < kps.size(); i++)
-//   {
-//     kps[i].octave = level;
-//     kps[i].pt = kps[i].pt * mvScaleFactors[level];
-//     kps[i].size = 30;
-//   }
-//   // PRINT(mImgWidth, mImgHeight);
-//   QuadTree::rectifyKps(kps, nPoints, 0, 0, mImgWidth, mImgHeight);
-
-//   return kps;
-// }
-
-// void FastOrbExtractor::detect(
-//     const cv::Mat &img, std::vector<cv::KeyPoint> &kps)
-// {
-//   // std::vector<cv::KeyPoint> ret(mNPoints);
-//   for (size_t level = 0; level < mNLevels; level++)
-//   {
-//     std::vector<cv::KeyPoint> octave_kps =
-//         detectPerLevel(img, level, mvNPointsPerLevels[level]);
-//     kps.insert(kps.end(), octave_kps.begin(), octave_kps.end());
-//   }
-//   // QuadTree::rectifyKps(kps, mNPoints, 0, 0, mImgWidth, mImgHeight);
-// }
-
-// void FastOrbExtractor::compute(
-// const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc)
-// {
-// mDescriptor->compute(img, kps, desc);
-// }
-
-// void FastOrbExtractor::detectAndCompute(
-//     const cv::Mat &img, std::vector<cv::KeyPoint> &kps, cv::Mat &desc)
-// {
-//   makeImagePyramid(img);
-
-//   for (size_t i = 0; i < mNLevels; ++i)
-//   {
-//     cv::Mat img = mvImgPyramid[i];
-//     std::vector<cv::KeyPoint> kps;
-//     cv::FAST(img, kps, 20, true);
-
-//     cv::cvtColor(img, img, cv::COLOR_GRAY2BGR);
-//     for (const cv::KeyPoint &kp : kps)
-//     {
-//       cv::circle(img, kp.pt, 1, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
-//     }
-//     PRINT(kps.size());
-
-//     // PRINT();
-//     cv::imshow("py", img);
-//     cv::waitKey();
-//   }
-//   // detect(img, kps);
-//   // mDescriptor->compute(img, kps, desc);
-// }
-
-// bool FastOrbExtractor::extract(const cv::Mat &img, KeyFramePtr keyFrame)
-// {
-//   // Key_frame *key_frame = new Key_frame();
-//   std::vector<cv::KeyPoint> pts;
-//   cv::Mat descriptor;
-//   this->detectAndCompute(img, pts, descriptor);
-
-//   if (pts.size() < 1000)
-//   {
-//     return false;
-//   }
-//   keyFrame->setDescriptor(descriptor);
-
-//   int nkps = pts.size();
-//   cv::Mat kps = cv::Mat(nkps, 2, CV_64F);
-//   cv::Mat kpsn = cv::Mat(nkps, 2, CV_64F);
-//   cv::Mat octave = cv::Mat(nkps, 1, CV_16F);
-//   cv::Mat sigma2 = cv::Mat(nkps, 1, CV_64F);
-//   cv::Mat sigma2inv = cv::Mat(nkps, 1, CV_64F);
-
-//   for (size_t i = 0; i < nkps; i++)
-//   {
-//     kps.at<double>(i, 0) = pts[i].pt.x;
-//     kps.at<double>(i, 1) = pts[i].pt.y;
-
-//     octave.at<uint8_t>(i) = pts[i].octave;
-
-//     sigma2.at<float>(i) = this->get_scale2(pts[i].octave);
-//     sigma2inv.at<float>(i) = this->get_scale2inv(pts[i].octave);
-//   }
-//   // this->camera.unproject(kps, kpsn);
-
-//   keyFrame->setKps(kps);
-//   keyFrame->setKpsn(kpsn);
-//   keyFrame->setOctave(octave);
-//   keyFrame->setSigma2(sigma2);
-//   keyFrame->setSigma2inv(sigma2inv);
-
-//   return true;
-// }
-
 float FastOrbExtractor::get_scale2inv(const int octave) const
 {
   return this->mvScaleFactorsInv[octave];
 }
-
 float FastOrbExtractor::get_scale2(const int octave) const
 {
   return this->mvScaleFactors[octave];

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <mutex>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/features2d.hpp>
@@ -26,8 +27,8 @@ class KeyFrame
   static cv::Mat K;
   static cv::Mat distCoef;
 
-  static constexpr size_t GRID_COLS = 64;
-  static constexpr size_t GRID_ROWS = 48;
+  static constexpr int GRID_COLS = 64;
+  static constexpr int GRID_ROWS = 48;
   static float gridColsInv;
   static float gridRowsInv;
 
@@ -82,6 +83,10 @@ class KeyFrame
       cv::Ptr<cv::ORB> featureExtractor,
       OrbVocabulary *pOrbVocabulary);
   KeyFrame(
+      const cv::Mat &img,
+      FastOrbExtractor *featureExtractor,
+      OrbVocabulary *pOrbVocabulary);
+  KeyFrame(
       cv::Mat &kps,
       cv::Mat &kpsn,
       cv::Mat &mDescriptors,
@@ -103,9 +108,10 @@ class KeyFrame
       const float &k1,
       const float &k2);
   int getID() const;
-  int getN() const;
-  std::vector<cv::KeyPoint> getKps() const;
-  cv::Mat getDescriptors() const;
+  size_t getN() const;
+  const std::vector<cv::KeyPoint> &getKps() const;
+  const cv::Mat &getDescriptors() const;
+  const DBoW2::FeatureVector &getFeatVec() const;
   cv::Mat getCameraCenter() const;
   std::vector<size_t> getKpsInGrid(
       const float &x,
@@ -186,16 +192,16 @@ class KeyFrame
   {
     this->mDescriptors = mDescriptors;
   };
-  std::vector<cv::Mat> get_bow_feature() const
-  {
-    std::vector<cv::Mat> ret;
-    ret.resize(mDescriptors.rows);
-    for (size_t i = 0; mDescriptors.rows > i; ++i)
-    {
-      ret[i] = mDescriptors.row(i);
-    }
-    return ret;
-  }
+  // std::vector<cv::Mat> get_bow_feature() const
+  // {
+  //   std::vector<cv::Mat> ret;
+  //   ret.resize(mDescriptors.rows);
+  //   for (size_t i = 0; mDescriptors.rows > i; ++i)
+  //   {
+  //     ret[i] = mDescriptors.row(i);
+  //   }
+  //   return ret;
+  // }
 
   // inline const cv::Mat get_idx_tracked_points() const
   // {

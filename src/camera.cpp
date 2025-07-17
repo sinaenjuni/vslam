@@ -4,13 +4,13 @@
 
 Camera::Camera() {}
 Camera::Camera(Settings &settings)
-    : fx(settings.fx),
+    : width(settings.imgWidth),
+      height(settings.imgHeight),
+      fx(settings.fx),
       fy(settings.fy),
       cx(settings.cx),
       cy(settings.cy),
-      bf(settings.bf),
-      width(settings.imgWidth),
-      height(settings.imgHeight)
+      bf(settings.bf)
 {
   // clang-format off
   K = (cv::Mat_<double>(3, 3) << fx, 0, cx, 
@@ -20,8 +20,15 @@ Camera::Camera(Settings &settings)
   Kinv = K.inv();
   Kinv /= Kinv.at<double>(2, 2);  // Kinv normalization
 }
-Camera::Camera(double fx, double fy, double cx, double cy, double bf, int width, int height)
-    : fx(fx), fy(fy), cx(cx), cy(cy), bf(bf), width(width), height(height)
+Camera::Camera(
+    double fx,
+    double fy,
+    double cx,
+    double cy,
+    double bf,
+    int width,
+    int height)
+    : width(width), height(height), fx(fx), fy(fy), cx(cx), cy(cy), bf(bf)
 {
   K = (cv::Mat_<double>(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
   Kinv = K.inv();

@@ -12,8 +12,6 @@
 // #include <g2o/types/sba/vertex_se3_expmap.h>
 // #include <g2o/types/slam3d/vertex_pointxyz.h>
 
-// #include "entities.h"
-#include "entities.h"
 #include "frame.h"
 #include "map.h"
 #include "misc.h"
@@ -65,11 +63,6 @@ cv::Mat Converter::ToCvMat(const Eigen::Matrix<double, 3, 1> &m)
   }
   return cvMat.clone();
 }
-Eigen::Matrix<double, 3, 1> Converter::ToVector3d(const PosD &pos)
-{
-  Eigen::Matrix<double, 3, 1> v(pos.x, pos.y, pos.z);
-  return v;
-}
 Eigen::Matrix<double, 3, 1> Converter::ToVector3d(const cv::Mat &pos)
 {
   Eigen::Matrix<double, 3, 1> v(
@@ -110,8 +103,9 @@ void Optimizer::BundleAdjustment(
       new g2o::OptimizationAlgorithmLevenberg(std::move(pSolver));
   g2o::SparseOptimizer optimizer;
   optimizer.setAlgorithm(solver);
+  optimizer.setVerbose(true);
 
-  long unsigned int maxKFID = 0;
+  int maxKFID = 0;
   for (size_t i = 0; i < vpKFs.size(); ++i)
   {
     KeyFrame *pKF = vpKFs[i];
@@ -139,7 +133,7 @@ void Optimizer::BundleAdjustment(
     vertexMP->setMarginalized(true);
     optimizer.addVertex(vertexMP);
 
-    std::map<KeyFramePtr, uvIdx> observations = pMP->getObservations();
+    std::map<KeyFrame *, uvIdx> observations = pMP->getObservations();
 
     // SET EDGES
     for (const auto &[pKF, imgIdx] : observations)

@@ -95,8 +95,8 @@ Viewer3D::Viewer3D(Settings settings, Map *pMap)
       ViewpointY(settings.ViewpointY),
       ViewpointZ(settings.ViewpointZ),
       ViewpointF(settings.ViewpointF),
-      is_running(true),
-      mpMap(pMap)
+      mpMap(pMap),
+      is_running(true)
 
 {
   pangolin::CreateWindowAndBind(window_name, window_width, window_height);

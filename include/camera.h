@@ -7,7 +7,8 @@
 class Camera
 {
  private:
-  int width, height;
+  int width;
+  int height;
   double fx, fy, cx, cy, bf;  // bf is base line multiply focal length
   cv::Mat K;                  // Intrinsic matrix
   cv::Mat Kinv;               // Inverse of intrinsic matrix
@@ -16,7 +17,14 @@ class Camera
  public:
   Camera();
   Camera(Settings &settings);
-  Camera(double fx, double fy, double cx, double cy, double bf, int width, int height);
+  Camera(
+      double fx,
+      double fy,
+      double cx,
+      double cy,
+      double bf,
+      int width,
+      int height);
   ~Camera();
 
   inline cv::Mat get_K() { return this->K; };

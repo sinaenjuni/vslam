@@ -1,5 +1,8 @@
 #include "misc.h"
 
+#include <opencv2/core/types.hpp>
+#include <opencv2/imgproc.hpp>
+
 namespace Matrix
 {
 // void to_homogeneous(const cv::Mat &input, cv::Mat &output)
@@ -51,7 +54,7 @@ void Misc::draw_kps(
 void Misc::draw_kps(
     const cv::Mat &img, const cv::Mat &kps, const cv::Scalar color)
 {
-  for (size_t i = 0; i < kps.rows; i++)
+  for (int i = 0; i < kps.rows; i++)
   {
     cv::circle(
         img,
@@ -67,9 +70,9 @@ void Misc::draw_line(
     cv::Mat &img,
     const cv::Mat kps_cur,
     const cv::Mat kps_ref,
-    cv::Scalar color)
+    const cv::Scalar color)
 {
-  for (size_t i = 0; i < kps_cur.rows; i++)
+  for (int i = 0; i < kps_cur.rows; i++)
   {
     cv::line(
         img,
@@ -79,6 +82,17 @@ void Misc::draw_line(
         1,
         cv::LINE_AA);
   }
+}
+
+void Misc::draw_line(
+    cv::Mat &img,
+    const cv::KeyPoint kp1,
+    const cv::KeyPoint kp2,
+    const cv::Scalar color)
+{
+  // cv::circle(img, kp1.pt, 2, cv::Scalar(0, 0, 255), -1, cv::LINE_AA);
+  // cv::circle(img, kp2.pt, 2, cv::Scalar(255, 0, 0), -1, cv::LINE_AA);
+  cv::line(img, kp1.pt, kp2.pt, color, 1, cv::LINE_AA);
 }
 
 std::vector<cv::Mat> Misc::splitToVectorFromCvMat(const cv::Mat &input)

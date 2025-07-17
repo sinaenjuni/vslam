@@ -119,7 +119,7 @@ std::vector<cv::KeyPoint> QuadTree::rectifyKps(
 
   std::vector<QuadTreeNode> lNodes;
   int xStart = xmin;
-  for (size_t i = 0; i < nInitNodes; ++i)
+  for (int i = 0; i < nInitNodes; ++i)
   {
     // QuadTreeNode node = QuadTreeNode(hX * i, 0, hX * (i + 1), ymax);
     // lNodes.push_back(node);
@@ -156,7 +156,8 @@ std::vector<cv::KeyPoint> QuadTree::rectifyKps(
 
   while (!pqNodes.empty())
   {
-    if (nPoints <= pqNodes.size() + lNodes.size())
+    if (nPoints <=
+        static_cast<int>(pqNodes.size()) + static_cast<int>(lNodes.size()))
     // Check the number of q_nodes and l_nodes to stop this iteration.
     {
       break;

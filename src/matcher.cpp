@@ -6,6 +6,7 @@
 #include <opencv2/features2d.hpp>
 #include <vector>
 
+#include "FeatureVector.h"
 #include "frame.h"
 
 constexpr int TH_HIGH = 100;
@@ -75,8 +76,8 @@ int Matcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
     dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
   }
 
-  return dist;  // 해밍 거리는 비트간이 차이이기 때문에 최소 0에서 최대 256
-                // 비트까지를 표현한다.
+  return dist;
+  // The hamming distance is in [0, 256] range.
 }
 
 void Matcher::computeThreeMaxima(
@@ -338,5 +339,165 @@ int Matcher::matchInGrid(
       }
     }
   }
+  return nMatches;
+}
+int Matcher::matchInBow(
+    KeyFrame *pKF, KeyFrame *pF, std::vector<MapPoint *> vMatchedMPs)
+{
+  const std::vector<MapPoint *> vpMPsKF = pKF->getMapPoints();
+  vMatchedMPs =
+      std::vector<MapPoint *>(pKF->getN(), static_cast<MapPoint *>(nullptr));
+  const DBoW2::FeatureVector &vFeatVecKF = pKF->getFeatVec();
+  const DBoW2::FeatureVector &vFeatVecF = pF->getFeatVec();
+
+  int nMatches = 0;
+  std::vector<int> rotHist[HISTO_LENGTH];  // 30
+  for (int i = 0; i < HISTO_LENGTH; i++)
+    rotHist[i].reserve(500);                 // 500 per indices
+  const float factor = 1.0f / HISTO_LENGTH;  // 1/30
+
+  DBoW2::FeatureVector::const_iterator KFit = vFeatVecKF.begin();
+  DBoW2::FeatureVector::const_iterator Fit = vFeatVecF.begin();
+  DBoW2::FeatureVector::const_iterator KFend = vFeatVecKF.end();
+  DBoW2::FeatureVector::const_iterator Fend = vFeatVecF.end();
+
+  while (KFit != KFend && Fit != Fend)
+  {
+    if (KFit->first == Fit->first)  // BoW vocablury 노드가 같다면,
+    // first항목 BoW 트리의 특정 노드 ID (NodeId) = visual word
+    {
+      const std::vector<unsigned int> vIndicesKF = KFit->second;
+      const std::vector<unsigned int> vIndicesF = Fit->second;
+      // 같은 vocablury node에 속하는 KP의 indices
+
+      for (size_t iKF = 0; iKF < vIndicesKF.size(); iKF++)
+      // KF의 key point 인덱스를 순회
+      {
+        const unsigned int realIdxKF = vIndicesKF[iKF];
+        // 이 부분이 이제 KP의 인덱스가 된다.
+        // MapPoints associated to keypoints, NULL pointer if no association.
+        MapPoint *pMP = vpMPsKF[realIdxKF];
+        // 인덱스에 해당하는 KF의 MP를 가져온다.
+
+        if (!pMP)
+        {
+          // NULL pointer는 관련없는 다른 프레임과의 관련성이 없는 포인트를 의미
+          continue;
+        }
+
+        // if (pMP->isBad())
+        // {
+        //   continue;
+        // }
+
+        const cv::Mat &dKF = pKF->getDescriptors().row(realIdxKF);
+        // 해당 이미지 포인트가 MP를 가지고 있다면, descriptor를 가져온다.
+
+        int bestDist1 = 256;  // 32bytes의 최대 hamming distance는 256
+        int bestIdxF = -1;
+        int bestDist2 = 256;
+
+        for (size_t iF = 0; iF < vIndicesF.size(); iF++)
+        // F에 존재하는 같은 BoW node의 index를 순회
+        {
+          const unsigned int realIdxF = vIndicesF[iF];
+
+          if (vMatchedMPs[realIdxF]) continue;
+
+          const cv::Mat &dF = pF->getDescriptors().row(realIdxF);
+          // 같은 BoW node에 속하는 F의 orb descriptor를 가져온다.
+
+          const int dist = DescriptorDistance(dKF, dF);
+          // hamming distance를 계산
+
+          if (dist < bestDist1)
+          {
+            bestDist2 = bestDist1;  // best1을 best2로 이동
+            bestDist1 = dist;       // best1에 dist 할당
+            bestIdxF = realIdxF;    // best1의 KP index 할당(F를 기준)
+          }
+          else if (dist < bestDist2)
+          // best1 보다는 크지만 best2보다는 작은 dist는 best2에 dist 저장
+          {
+            bestDist2 = dist;
+          }
+        }
+
+        if (bestDist1 <= TH_LOW)
+        {  // mfTestRatio = 0.7, ratio test로 best2에 0.7배 해도 best1보다
+           // dist가 가깝다면 이 포인트는 일치하는 포인트라고 간주
+          if (static_cast<float>(bestDist1) <
+              mfTestRatio * static_cast<float>(bestDist2))
+          {
+            vMatchedMPs[bestIdxF] = pMP;
+            // best1의 index에 대한 MP를 저장
+
+            const cv::KeyPoint &kp = pKF->getKps()[realIdxKF];
+            // best1의 index에 대한 KP
+
+            if (mbCheckOrientation)
+            {
+              float rot = kp.angle - pF->getKps()[bestIdxF].angle;
+              // KF과 F의 KP의 각도 차이를 계산
+              if (rot < 0.0)  // 회전 일관성 보장을 위해
+                rot += 360.0f;
+              int bin = round(rot * factor);
+              if (bin == HISTO_LENGTH) bin = 0;
+              assert(bin >= 0 && bin < HISTO_LENGTH);
+              rotHist[bin].push_back(bestIdxF);
+            }
+            nMatches++;
+          }
+        }
+      }
+
+      KFit++;
+      Fit++;
+    }
+    else if (KFit->first < Fit->first)
+    // 같은 node가 나올 때까지, 더 낮은 node를 가르키는 iterator에 높은 node를
+    // 가르키는 iterator의 위치로 옮긴다. map은 기본적으로 정렬된 상태로
+    // 데이터를 기록한다. KFit와 Kit 중에서 더 낮은 node를 가르키고 있다면,
+    {
+      KFit = vFeatVecKF.lower_bound(Fit->first);
+      // lower_bound 의미상, 이상에 해당하는 값을 찾는다.
+      // m[10] = "a";
+      // m[20] = "b";
+      // m[30] = "c";
+      // m.lower_bound(15) -> 15는 없지만 m[20]에 해당하는 iterator를 반환한다.
+      // m.lower_bound(10) -> 10은 존재하기 때문에 m[10]에 해당하는 iterator를
+      // 반환한다. upper_bound 의미상, 초과에 해당하는 값을 찾는다.
+      // m.upper_bound(15) -> 15는 없지만 m[20]에 해당하는 iterator를 반환한다.
+      // m.upper_bound(10) -> 10은 존재하지만 m[20]에 해당하는 iterator를
+      // 반환한다.
+    }
+    else  // 반대로 F의 node가 작다면,
+    {
+      Fit = vFeatVecF.lower_bound(KFit->first);
+    }
+  }
+
+  if (mbCheckOrientation)
+  {
+    int ind1 = -1;
+    int ind2 = -1;
+    int ind3 = -1;
+
+    computeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+
+    for (int i = 0; i < HISTO_LENGTH; i++)
+    {
+      if (i == ind1 || i == ind2 || i == ind3)
+      {
+        continue;
+      }
+      for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+      {
+        vMatchedMPs[rotHist[i][j]] = static_cast<MapPoint *>(NULL);
+        nMatches--;
+      }
+    }
+  }
+
   return nMatches;
 }

@@ -1,7 +1,6 @@
 #include <bow.h>
 #include <opencv2/core/hal/interface.h>
 
-#include <cstddef>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/cvstd_wrapper.hpp>
@@ -10,10 +9,9 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
-#include <vector>
 
-#include "entities.h"
 // #include "extractor.h"
+#include "extractor.h"
 #include "geometry.h"
 #include "map.h"
 #include "map_point.h"
@@ -72,16 +70,25 @@ void vslam_main()
   //     7,
   //     20);
 
-  cv::Ptr<cv::ORB> featureExtractor = cv::ORB::create(
+  FastOrbExtractor *featureExtractor = new FastOrbExtractor(
       settings.nPoints,
-      settings.scaleFactor,
       settings.nLevels,
-      31,
-      0,
-      2,
-      cv::ORB::FAST_SCORE,
-      31,
+      settings.imgWidth,
+      settings.imgHeight,
+      settings.scaleFactor,
+      7,
       20);
+
+  // cv::Ptr<cv::ORB> featureExtractor = cv::ORB::create(
+  //     settings.nPoints,
+  //     settings.scaleFactor,
+  //     settings.nLevels,
+  //     31,
+  //     0,
+  //     2,
+  //     cv::ORB::FAST_SCORE,
+  //     31,
+  //     20);
 
   Matcher *pMatcher = new Matcher(0.6, false);
 
@@ -95,7 +102,7 @@ void vslam_main()
 
   // KeyFramePtr lastKeyFrame = nullptr;
   // bool is_init = false;
-  KeyFrame *framePrev = nullptr;
+  // KeyFrame *framePrev = nullptr;
   cv::Mat grayImg, colorImg;
   cv::VideoCapture cap(settings.imgPath);
   while (true)
@@ -184,7 +191,6 @@ void vslam_main()
     //   cv::circle(colorImg, pt2, 2, cv::Scalar(255, 0, 0), 1);
     //   cv::line(colorImg, pt1, pt2, cv::Scalar(0, 0, 255), 1);
     // }
-
 
     // for (int &count : nPointsPerLevel)
     // {
@@ -277,7 +283,7 @@ void vslam_main()
     if (key == 27) break;                // ESC
 
     // lastKeyFrame = keyFrame;
-    framePrev = frame;
+    // framePrev = frame;
   }
 
   cv::destroyAllWindows();
